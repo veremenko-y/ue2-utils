@@ -1,6 +1,6 @@
 #include <stdio.h>
 /*#include 	<a.out.h>*/
-#include "obj.h"
+#include <obj.h>
 
 /*
 	size -- determine object size

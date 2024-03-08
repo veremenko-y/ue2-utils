@@ -2,9 +2,7 @@
 
 # === Set up path to point to UE2 utils ===
 PATH="$(pwd)/bin:$PATH"
-# Hackery. Extracting PREFIX variable from makefile
-source <(cat Makefile | grep ^PREFIX)
-
+PREFIX=ue2-
 AS=${PREFIX}as
 NM=${PREFIX}nm
 SIZE=${PREFIX}size
@@ -15,9 +13,10 @@ LD=${PREFIX}ld
 if [[ -d tmp ]]; then 
     #rm -rf tmp;
     find tmp -type f -delete
+else
+    mkdir tmp
 fi
 
-mkdir tmp
 cp -r tests/* tmp
 cd tmp
 
@@ -30,10 +29,10 @@ if [[ $1 != "" ]]; then
     path=t$1
 fi
 for dir in "$path"*; do
-    pushd $dir || exit
-    echo $(pwd)
+    pushd $dir 1>/dev/null || exit
     cecho "as:"
     for f in *.s; do
+        cecho $(pwd)$f
         $AS -o "${f%.*}.out" $f
     done
     # cecho "nm:"
@@ -45,9 +44,10 @@ for dir in "$path"*; do
     #     echo $f
     #     $REL $f
     # done
-    cecho "ld:"
-    $LD -r -o out.obj 01main.out 02lib.out
-    #$LD -o out.bin 01main.out 02lib.out
+    cecho "ld => obj:"
+    $LD -r -o out.obj *.out
+    cecho "ld => bin:"
+    $LD -o out.bin *.out
     popd 1>/dev/null
 done
 

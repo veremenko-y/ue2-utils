@@ -1,10 +1,12 @@
+export PWD=$(shell pwd)
+
 export CC := gcc
 export ARCH= -m32
 export CFLAGS =
 
 export BIN_DIR = $(PWD)/bin
 export TMP_DIR = $(PWD)/tmp
-export INSTALL_DIR = /opt/ue2
+export DESTDIR = /opt/ue2
 export PREFIX = ue2-
 
 ifdef RELEASE
@@ -20,7 +22,7 @@ CFLAGS += -fdiagnostics-color=always -std=c90 $(ARCH) $(DISWARN)
 
 export LDFLAGS = $(ARCH)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean install
 
 all: as apps
 
@@ -37,6 +39,10 @@ clean:
 distclean: clean
 	rm -f $(BIN_DIR)/*
 	rm -rf $(TMP_DIR)/*
+
+install:
+	install -d $(DESTDIR)/bin
+	install -m 755 $(BIN_DIR)/* $(DESTDIR)/bin
 
 $(BIN_DIR):
 	mkdir -p $@

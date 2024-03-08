@@ -6,7 +6,6 @@ loop:
 done:
     bz      done         ; keep spinning in place
 .globl echo
-.globl echo5
     jsr     echo
     lda     1
     adc     loop

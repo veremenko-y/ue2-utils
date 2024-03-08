@@ -8,7 +8,7 @@
 /*#include	<ar.h>
 #include	<a.out.h>*/
 #include "ar.h"
-#include "obj.h"
+#include <obj.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

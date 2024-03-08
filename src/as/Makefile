@@ -13,6 +13,5 @@ clean:
 $(BIN): $(OBJ) | $(BIN_DIR)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-#$(OBJ)/%.o: $(SRC)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@

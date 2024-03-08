@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include "obj.h"
+#include <obj.h>
 #include "ar.h"
 #include "dbg.h"
 
