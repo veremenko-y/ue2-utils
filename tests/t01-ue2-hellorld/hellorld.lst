@@ -1,0 +1,22 @@
+;           include 'lib/labels.inc'
+;           include '../sdk/ue2_io.inc'
+;           include '../sdk/macros.inc'
+;           loop:
+000: 30 12  ldl hellorld
+002: B0 1C  cmp zero
+;           done:
+004: 00 04  bz done
+006: 4F FC  stl TX
+008: 20 01  lda 1
+00A: A0 01  adc loop+1
+00C: 40 01  stl loop+1
+00E: 90 02  scf Z
+010: 00 00  bz loop
+;           hellorld:
+;           db '\nHellorld'
+012: 5C 6E 48 65 6C 6C 6F 72  
+     6C 64  
+;           zero:
+;           db 0
+01C: 00  
+;           EmitConsts

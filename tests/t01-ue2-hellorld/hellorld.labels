@@ -1,0 +1,5 @@
+TX=00000FFC
+loop=00000000
+done=00000004
+hellorld=00000012
+zero=0000001C

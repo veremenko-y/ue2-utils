@@ -1,0 +1,9 @@
+ldl hellorld
+cmp zero
+bz done
+stl TX
+lda 1
+adc loop+1
+stl loop+1
+scf Z
+bz loop
