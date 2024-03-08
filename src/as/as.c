@@ -17,10 +17,9 @@ struct hdr hdr = {
     0,
 };
 
-uint8_t uflg;
 uint8_t oflg;
 uint8_t ofilen[16] = "a.out";
-int lineno;
+uint16_t lineno;
 #define TMPC 6
 char tasfilen[] = "outsegXXX";
 
@@ -738,6 +737,7 @@ FILE *f;
     }
 }
 
+#if TRACE >= 1
 dumpsymone(sym) struct symtab *sym;
 {
     char buf[1024];
@@ -798,6 +798,11 @@ dumpsym()
     }
 */
 }
+#else
+dumpsym() {}
+dumpsymone(sym) struct symtab *sym;
+{}
+#endif
 
 main(argc, argv) int argc;
 char **argv;
@@ -813,9 +818,6 @@ char **argv;
         switch ((*argv)[1])
         {
         case '\0':
-            break;
-        case 'u':
-            uflg = 1;
             break;
         case 'o':
             oflg = 1;
