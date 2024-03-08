@@ -1,15 +1,16 @@
+.text
 .set Z, 1
-.set TX, 0xffc
 
 loop:
     ldl     hellorld
     cmp     zero
 done:
     bz      done         ; keep spinning in place
-    stl     TX
+.globl echo
+    jsr     echo
     lda     1
-    adc     loop ; adc     loop+1
-    stl     loop ; stl     loop+1
+    adc     loop
+    stl     loop
     
     scf     Z
     bz      loop

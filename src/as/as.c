@@ -6,6 +6,10 @@
 #include "ue2.h"
 #include "dbg.h"
 
+#if TRACE >= 1
+#define unlink(...)
+#endif
+
 struct hdr hdr = {
     0410,
     0,
@@ -158,12 +162,11 @@ scan()
     int count = 0;
 loop:
     tok = (type + 1)[c = getchar()];
-    TRACE3("line %d: char '%c'(%d) token %d\n", lineno, c,c,tok);
     switch (tok)
     {
     case EOF:
         tok = TEOF;
-        goto ret;
+        goto done;
     case TCOMM:
         while ((c = getchar()) != '\n' && c != EOF)
             ;
@@ -298,12 +301,17 @@ ret:
     }
     if (tok != TEOF)
         goto loop;
+done:
 }
 
 lex()
 {
-loop:
     tok = getchar();
+    if (tok == EOF)
+    {
+        tok = TEOF;
+        return tok;
+    }
     switch (tok)
     {
     case TNAME:
@@ -345,10 +353,8 @@ parseex(e) struct exp *e;
         sp = lexval;
         e->xtype = sp->type;
         e->xvalue = sp->value;
-        /*
-        write 0 into the segment
-        index will be picked  from relocaiton table instead
-        */
+        /* write 0 into the segment
+            index will be picked  from relocaiton table instead */
         e->xname = sp;
     }
     else
@@ -536,7 +542,8 @@ parse()
                 state = tok;
                 while ((tok = lex()) != TNL)
                 {
-                    if (tok == TCOMMA) {
+                    if (tok == TCOMMA)
+                    {
                         continue; /* skip comma */
                     }
                     i = lexval;
@@ -593,8 +600,9 @@ parse()
                 expect(TCOLON, ":");
                 if (passno == 1)
                 {
-                    if (sym->type & XTYPE != XUNDEF)
+                    if ((sym->type & XTYPE) != XUNDEF)
                     {
+                        TRACE1("type %d value %d\n", sym->type, sym->value);
                         error("%s redef", sym->name);
                     }
                     sym->value = dotp->xvalue;
@@ -638,7 +646,7 @@ struct symtab *xsym;
     short t;
     if (passno != 2)
     {
-        
+
         dotp->xvalue += reflen[reftype];
         return;
     }
@@ -696,7 +704,7 @@ struct symtab *xsym;
     {
         fwrite(pval, 1, t, txtfil);
     }
-    #if TRACE >= 1
+#if TRACE >= 1
     { /* DEBUG*/
         char str[NCPS + 2];
         str[0] = 0;
@@ -706,7 +714,7 @@ struct symtab *xsym;
         }
         TRACE1("OUTREL (%s) addr=0x%06x[%d] type=0x%x len=0x%x value=0x%x\n", str, tl, t, ts, tc, *pval);
     }
-    #endif
+#endif
 }
 
 int sizesymtab()
@@ -776,7 +784,6 @@ dumpsymone(sym) struct symtab *sym;
     TRACE1(buf);
 }
 
-
 dumpsym()
 {
     int i;
@@ -787,21 +794,22 @@ dumpsym()
         dumpsymone(lastnam);
         lastnam++;
     }
-/*
-    TRACE1("hashtab size: %d\n", NHASH);
-    for(i =0 ; i < NHASH; i++) {
-        if(hshtab[i] != NULL) {
-            lastnam = hshtab[i];
-            TRACE1("hash %d\n", i);
-            dumpsymone(lastnam);
+    /*
+        TRACE1("hashtab size: %d\n", NHASH);
+        for(i =0 ; i < NHASH; i++) {
+            if(hshtab[i] != NULL) {
+                lastnam = hshtab[i];
+                TRACE1("hash %d\n", i);
+                dumpsymone(lastnam);
+            }
         }
-    }
-*/
+    */
 }
 #else
 dumpsym() {}
 dumpsymone(sym) struct symtab *sym;
-{}
+{
+}
 #endif
 
 main(argc, argv) int argc;
@@ -838,14 +846,15 @@ char **argv;
     {
         error("no file");
     }
-    if (freopen(*argv, "r", stdin) == NULL)
-    {
-        error("can't open %s\n");
-    }
+
+    /* Init hash table
+        commented out because we rely
+        on BSS initializing it
     for (i = 0; i < NHASH; i++)
     {
         hshtab[i] = 0;
     }
+    */
 
     /* TODO: dynamic alloc */
     /*
@@ -879,14 +888,34 @@ char **argv;
         usedot[i + NLOC].xtype = XDATA;
     }
 
-    /* tasfile = fopen(mktemp(tmpasfilen), "w"); */
+    /*
+     * PASS 0
+     */
+    /* temp file for scan result */
     mkfile(0, 's');
     txtfil = fopen(tasfilen, "wb");
-    lineno = 1;
-    TRACE1("scanning\n");
-    scan();
+
+    /* this workflow doesn't really work */
+    while (argc > 0)
+    {
+        if (freopen(*argv, "r", stdin) == NULL)
+        {
+            error("can't open %s\n");
+        }
+        lineno = 1;
+        TRACE1("scanning %s\n", *argv);
+        puts(*argv);
+        scan();
+        i = ftell(txtfil);
+        TRACE1("last byte written %d (%04x)\n", i, i);
+        argv++;
+        argc--;
+    }
     fclose(txtfil);
 
+    /*
+     * PASS 1
+     */
     lineno = 1;
     passno = 1;
     freopen(tasfilen, "rb", stdin);
@@ -941,31 +970,32 @@ char **argv;
         dsize += tok;
     }
 
-	hdr.bsize = dsize;
-	/* assign final values to symbols */
+    hdr.bsize = dsize;
+    /* assign final values to symbols */
     i = 0;
     for (lastnam = symtab; lastnam < symcur; lastnam++)
     {
-		/*
+        /*
         * We could reenable this code if we want all undefined
         * to automatically become external
         if ((lastnam->type&XTYPE)==XUNDEF)
-			lastnam->type = XXTRN+XUNDEF;
-		else 
+            lastnam->type = XXTRN+XUNDEF;
+        else
         */
-        if ((lastnam->type&XTYPE)==XDATA)
-			lastnam->value += usedot[lastnam->index].xvalue;
-		else if ((lastnam->type&XTYPE)==XTEXT)
-			lastnam->value += usedot[lastnam->index].xvalue;
-		else if ((lastnam->type&XTYPE)==XBSS) {
-			long bs;
-			bs = lastnam->value;
-			lastnam->value = hdr.bsize + datbase;
-			hdr.bsize += bs;
-		}
+        if ((lastnam->type & XTYPE) == XDATA)
+            lastnam->value += usedot[lastnam->index].xvalue;
+        else if ((lastnam->type & XTYPE) == XTEXT)
+            lastnam->value += usedot[lastnam->index].xvalue;
+        else if ((lastnam->type & XTYPE) == XBSS)
+        {
+            long bs;
+            bs = lastnam->value;
+            lastnam->value = hdr.bsize + datbase;
+            hdr.bsize += bs;
+        }
         lastnam->index = i++;
-	}
-	hdr.bsize -= dsize;
+    }
+    hdr.bsize -= dsize;
     hdr.dsize = dsize;
     hdr.tsize = tsize;
     hdr.ssize = sizesymtab();

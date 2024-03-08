@@ -9,6 +9,8 @@ export TMP_DIR = $(PWD)/tmp
 export DESTDIR = /opt/ue2
 export PREFIX = ue2-
 
+RELEASE=1
+
 ifdef RELEASE
 CFLAGS +=-Os -s
 else

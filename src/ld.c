@@ -790,7 +790,7 @@ FILE *f, *frel;
             fwrite(&value, 1, 1, f);
             break;
         case LEN2:
-            max = (1 << 12) - 1; /* UE2 max address is 12 bit */
+            max = MAXADDR;
             bswap16(&value);
             fwrite(&value, 2, 1, f);
             break;
@@ -1037,7 +1037,7 @@ finishout()
 
 delexit()
 {
-    unlink("l.out");
+    /*unlink("l.out");*/
     unlink(doutn);
     unlink(troutn);
     unlink(droutn);
@@ -1085,26 +1085,6 @@ void error(char *format, ...)
     exit(1);
 }
 
-dumprel()
-{
-    TRACE1(dechex("tsize", tsize));
-    TRACE1(dechex("dsize", dsize));
-    TRACE1(dechex("bsize", bsize));
-    TRACE1(dechex("trsize", trsize));
-    TRACE1(dechex("drsize", drsize));
-    TRACE1(dechex("ssize", ssize));
-    TRACE1(dechex("ctrel", ctrel));
-    TRACE1(dechex("cdrel", cdrel));
-    TRACE1(dechex("cbrel", cbrel));
-    TRACE1(dechex("ctorel", ctorel));
-    TRACE1(dechex("cdorel", cdorel));
-    TRACE1(dechex("cborel", cborel));
-    TRACE1(dechex("torigin", torigin));
-    TRACE1(dechex("dorigin", dorigin));
-    TRACE1(dechex("borigin", borigin));
-    TRACE1(dechex("database", database));
-}
-
 main(argc, argv) int argc;
 char **argv;
 {
@@ -1143,12 +1123,12 @@ char **argv;
                     TRACE1("-s\n");
                     sflag++;
                     break;
-                    ;
                 case 'r':
                     TRACE1("-r\n");
                     rflag++;
                     break;
                 default:
+                    error("bad flag %c",p[i]);
                     break;
                 }
             }
@@ -1159,7 +1139,6 @@ char **argv;
         }
     }
 
-    dumprel();
     middle();
     setupout();
     puts("pass 2");
@@ -1189,7 +1168,6 @@ char **argv;
     }
 
     finishout();
-    dumprel();
     dumpsym();
     delarg = errlev;
     delexit();

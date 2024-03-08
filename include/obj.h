@@ -10,7 +10,7 @@
 
 #define NCPS 8 /* length of label/symbol */
 #define ADDRTYPE uint16_t
-#define MAXADDR ((1 << 12)−1) /* yaros todo: move to ue2.h */
+#define MAXADDR ((1 << 12) - 1) /* yaros todo: move to ue2.h */
 
 #define A_MAGIC1 0407 /* normal */
 #define A_MAGIC2 0410 /* read-only text */

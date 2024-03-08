@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # === Set up path to point to UE2 utils ===
-PATH="$(pwd)/bin:$PATH"
-PREFIX=ue2-
-AS=${PREFIX}as
-NM=${PREFIX}nm
-SIZE=${PREFIX}size
-REL=${PREFIX}rel
-LD=${PREFIX}ld
+export PATH="$(pwd)/bin:$PATH"
+export PREFIX=ue2-
+export AS=${PREFIX}as
+export NM=${PREFIX}nm
+export SIZE=${PREFIX}size
+export REL=${PREFIX}rel
+export LD=${PREFIX}ld
 
 # === Set up test location ===
 if [[ -d tmp ]]; then 
@@ -31,10 +31,14 @@ fi
 for dir in "$path"*; do
     pushd $dir 1>/dev/null || exit
     cecho "as:"
-    for f in *.s; do
-        cecho $(pwd)$f
-        $AS -o "${f%.*}.out" $f
-    done
+    if [[ -f 'as.sh' ]]; then
+        bash as.sh
+    else
+        for f in *.s; do
+            cecho $(pwd)/$f
+            $AS -o "${f%.*}.out" $f
+        done
+    fi
     # cecho "nm:"
     # $NM *.out
     # cecho "size:"
@@ -44,10 +48,10 @@ for dir in "$path"*; do
     #     echo $f
     #     $REL $f
     # done
-    cecho "ld => obj:"
-    $LD -r -o out.obj *.out
-    cecho "ld => bin:"
-    $LD -o out.bin *.out
+    # cecho "ld => obj:"
+    # $LD -r -o out.obj *.out
+    # cecho "ld => bin:"
+    # $LD -o out.bin *.out
     popd 1>/dev/null
 done
 
