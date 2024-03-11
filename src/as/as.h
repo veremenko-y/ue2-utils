@@ -1,4 +1,8 @@
+#ifdef __GNUC__
 #include <obj.h>
+#else
+#include "obj.h"
+#endif
 
 #define NLOC 1	   /* number of location ctrs */
 
@@ -61,28 +65,28 @@ struct modexpr {
 #define LOBYTE 31
 
 /* Pseudo instruction types */
-#define ISPACE ((char)(1 + 32))
-#define IBYTE ((char)(2 + 32))
-#define IWORD ((char)(3 + 32))
-/*#define ILONG ((char)(4 + 32))*/
-#define ISET ((char)(8 + 32))
-/*#define ICOMM ((char)(10 + 32))
-#define ILSYM ((char)(12 + 32))
-#define IFLOAT ((char)(14 + 32))
-#define IDOUBLE ((char)(15 + 32))
-#define IORG ((char)(16 + 32))
-#define ISTAB ((char)(17 + 32))
-#define IREG ((char)(18 + 32))
-#define IINT ((char)(5 + 32))*/
-#define IALIGN ((char)(13 + 32))
-#define IDATA ((char)(6 + 32))
-#define IGLOBAL ((char)(7 + 32))
-#define ITEXT ((char)(9 + 32))
-#define ILCOMM ((char)(11 + 32))
-#define IREG ((char)(12 + 32))
-/*#define IBREG ((char)(13 + 32))*/
-#define ILOB ((char)(14 + 32))
-#define IHIB ((char)(15 + 32))
+#define ISPACE (1 + 32)
+#define IBYTE (2 + 32)
+#define IWORD (3 + 32)
+/*#define ILONG (4 + 32)*/
+#define ISET (8 + 32)
+/*#define ICOMM (10 + 32)
+#define ILSYM (12 + 32)
+#define IFLOAT (14 + 32)
+#define IDOUBLE (15 + 32)
+#define IORG (16 + 32)
+#define ISTAB (17 + 32)
+#define IREG (18 + 32)
+#define IINT (5 + 32)*/
+#define IALIGN (13 + 32)
+#define IDATA (6 + 32)
+#define IGLOBAL (7 + 32)
+#define ITEXT (9 + 32)
+#define ILCOMM (11 + 32)
+#define IREG (12 + 32)
+/*#define IBREG (13 + 32)*/
+#define ILOB (14 + 32)
+#define IHIB (15 + 32)
 
 
 #define ERR (-1)

@@ -1,14 +1,15 @@
 #include <stdio.h>
+#ifdef __GNUC__
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
+
 #include "as.h"
 #include "ue2.h"
 #include "dbg.h"
-
-#if TRACE >= 1
-#define unlink(...)
-#endif
 
 struct hdr hdr = {
     0410,
@@ -57,18 +58,20 @@ uintptr_t lexval;
 uint8_t reflen[] = {0, 0, 1, 1, 2, 2, 4, 4, 8, 8}; /* length of relocation value */
 uint16_t datbase = 0;                              /* base of the data segment */
 
-error(char *format, ...)
+/*int _print (format, args)
+    char *format;
+    va_list *args;*/
+error(format, args) char *format;
+va_list *args;
 {
     fprintf(stderr, "line %d: ", lineno);
-    va_list argp;
-    va_start(argp, format);
-    vfprintf(stderr, format, argp);
-    va_end(argp);
+    fprintf(stderr, format, args);
     fprintf(stderr, "\n");
     exit(2);
 }
 
-expect(int val, char *arg)
+expect(val, arg) int val;
+char *arg;
 {
     tok = lex();
     if (tok != val)
@@ -106,7 +109,7 @@ struct symtab **
 lookup(install)
 uint8_t install;
 {
-    uint16_t hash;
+    int16_t hash;
     uint16_t i;
     uint8_t *p1;
     uint8_t *p2;
@@ -166,7 +169,7 @@ loop:
     {
     case EOF:
         tok = TEOF;
-        goto done;
+        return;
     case TCOMM:
         while ((c = getchar()) != '\n' && c != EOF)
             ;
@@ -316,7 +319,6 @@ ret:
     }
     if (tok != TEOF)
         goto loop;
-done:
 }
 
 uintptr_t
@@ -484,7 +486,7 @@ parseex(e) struct exp *e;
     if (tok == TLP)
     {
         parseex(e);
-        expect(TRP, ')');
+        expect(TRP, ")");
     }
     else if (tok == TINT)
     {
@@ -602,7 +604,7 @@ outb(val)
     if (passno == 2)
     {
         fwrite(&val, 1, 1, txtfil);
-        TRACE2("OUTB %02x\n", (unsigned char)val);
+        TRACE2("OUTB %02x\n", (char)val);
     }
 }
 
@@ -999,73 +1001,6 @@ FILE *f;
     }
 }
 
-#if TRACE >= 1
-dumpsymone(sym) struct symtab *sym;
-{
-    char buf[1024];
-    char *t = buf;
-    t += sprintf(t, "\t'%s'[idx: %d] type=%d (", sym->name, sym->index, sym->type);
-    if (sym->type == 0)
-        t += sprintf(t, " XUNDEF ");
-    if ((sym->type & XABS) == XABS)
-        t += sprintf(t, " XABS ");
-    if ((sym->type & XDATA) == XDATA)
-        t += sprintf(t, " XDATA ");
-    if ((sym->type & XTEXT) == XTEXT)
-        t += sprintf(t, " XTEXT ");
-    if ((sym->type & XBSS) == XBSS)
-        t += sprintf(t, " XBSS ");
-    if ((sym->type & XDATAO) == XDATAO)
-        t += sprintf(t, " XDATAO ");
-    if ((sym->type & XBSSO) == XBSSO)
-        t += sprintf(t, " XBSSO ");
-    if ((sym->type & XTEXTO) == XTEXTO)
-        t += sprintf(t, " XTEXTO ");
-    if ((sym->type & XABSO) == XABSO)
-        t += sprintf(t, " XABSO ");
-    if ((sym->type & XUNDEFO) == XUNDEFO)
-        t += sprintf(t, " XUNDEFO ");
-    if ((sym->type & XTXRN) == XTXRN)
-        t += sprintf(t, " XTXRN ");
-    if ((sym->type & XXTRN) == XXTRN)
-        t += sprintf(t, " XXTRN ");
-    if ((sym->type & XTYPE) == XTYPE)
-        t += sprintf(t, " XTYPE ");
-    if ((sym->type & XFORW) == XFORW)
-        t += sprintf(t, " XFORW ");
-    t += sprintf(t, ") val=0x%x\n", sym->value);
-    *t = '\0';
-    TRACE1(buf);
-}
-
-dumpsym()
-{
-    int i;
-    TRACE1("symtab size %d\n", hshused);
-    lastnam = symtab;
-    while (lastnam < symcur)
-    {
-        dumpsymone(lastnam);
-        lastnam++;
-    }
-    /*
-        TRACE1("hashtab size: %d\n", NHASH);
-        for(i =0 ; i < NHASH; i++) {
-            if(hshtab[i] != NULL) {
-                lastnam = hshtab[i];
-                TRACE1("hash %d\n", i);
-                dumpsymone(lastnam);
-            }
-        }
-    */
-}
-#else
-dumpsym() {}
-dumpsymone(sym) struct symtab *sym;
-{
-}
-#endif
-
 main(argc, argv) int argc;
 char **argv;
 {
@@ -1115,11 +1050,11 @@ char **argv;
     symcur = symtab;
     symend = &symtab[sizeof(symtab)];
     */
-
+    TRACE1("alloc symtab\n");
     symcur = symtab = sbrk(200 * sizeof(struct symtab));
     symend = sbrk(0);
     nsyms = 0;
-
+    TRACE1("install symtable\n");
     /*
      * Install symbol table
      */
@@ -1255,7 +1190,6 @@ char **argv;
     hdr.dsize = dsize;
     hdr.tsize = tsize;
     hdr.ssize = sizesymtab();
-    dumpsym();
     puts("pass 2");
     /*
      PASS 2
@@ -1343,7 +1277,6 @@ char **argv;
         lastnam->type &= ~XFORW;
         lastnam->index = 0;
     }
-    dumpsym();
     symwrite(symtab, symcur - symtab, txtfil);
 
     /*
@@ -1351,7 +1284,6 @@ char **argv;
      */
     fseek(txtfil, 0L, 0);
     fwrite(&hdr, sizeof(hdr), 1, txtfil);
-    fseek(txtfil, 0, SEEK_END);
     fclose(txtfil);
 
     TRACE1("==============\n");

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #else
 #define PACKED
+#include "pdp11_stdint.h"
 #endif
 
 #define NCPS 32 /* length of label/symbol */

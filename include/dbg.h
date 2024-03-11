@@ -1,39 +1,6 @@
 /* DEBUG */
-/* Token types */
-#ifndef DEBUGH
-#define DEBUGH
-FILE *debugfiles[8];
-#endif
-
-#define DSCAN 0
-#define DLEX 1
-
-#define DBGINIT()                                      \
-	{                                                  \
-		debugfiles[DSCAN] = fopen("dbgscan.tmp", "w"); \
-		debugfiles[DLEX] = fopen("dbglex.tmp", "w");   \
-	}
-
-#define DBGCLOSE()                 \
-	{                              \
-		fclose(debugfiles[DSCAN]); \
-		fclose(debugfiles[DLEX]);  \
-	}
-
-#define DBGTOK(tok) ""
-/*(tok >= 0 ? DEBUGSTRINGS[tok] : DEBUGSTRINGS[tok + 256])*/
-
-#define DBGSCAN(...)                             \
-	{                                            \
-		fprintf(debugfiles[DSCAN], __VA_ARGS__); \
-	}
-
-#define DBGLEX(...)                               \
-	{                                             \
-		fprintf(debugfiles[DLEX], __VA_ARGS__); \
-	}
-
-#define TRACE 0
+#ifndef DEBUG_H
+#define DEBUG_H
 
 #ifndef __FUNCTION_NAME__
     #ifdef WIN32   /*WINDOWS*/
@@ -43,6 +10,22 @@ FILE *debugfiles[8];
     #endif
 #endif
 
+#define TRACE 3
+
+#if TRACE > 0
+#define TRACE1 printf
+#define TRACE2 printf
+#define TRACE3 printf
+#define hexdump nothing
+#else
+#define TRACE1 nothing
+#define TRACE2 nothing
+#define TRACE3 nothing
+#endif
+nothing() {}
+
+#endif
+/*
 #define TRACEFUNC() {fprintf(stdout, "[%s] ", __FUNCTION_NAME__);}
 
 #if TRACE >= 1
@@ -111,3 +94,4 @@ int width;
         putchar('\n');
     }
 }
+*/
