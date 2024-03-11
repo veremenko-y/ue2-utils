@@ -203,7 +203,8 @@ struct stream *sp;
     size_t r;
     uint8_t c;
 
-    TRACE3("[%s] pos=%04x (%d) len=%d\n", sp->tag, sp->pos, sp->pos, sp->len);
+    TRACE3("[%s] pos=0x%04x (%d) len=%d\n", sp->tag, sp->pos, sp->pos, sp->len);
+    TRACE3("[%s] globpos=0x%04x (%d) globsize=%d\n", sp->tag, sp->globpos, sp->globpos, sp->globpos);
     if (sp->len < 1)
     {
         error("get: stream overflow");
@@ -227,7 +228,7 @@ struct stream *sp;
     TRACE3("[%s] pos=%04x (%d) len=%d\n", sp->tag, sp->pos, sp->pos, sp->len);
     if (sp->len < 2)
     {
-        error("get: stream overflow");
+        error("get16: stream overflow");
     }
     r = fread(&c, 1, sizeof(c), sp->file);
     if (r <= 0)
@@ -600,6 +601,7 @@ load2(libflg, off)
     off2 = TREL_OFFSET(filhdr);
     dseek(&text, off + off1, filhdr.tsize);
     dseek(&reloc, off + off2, filhdr.trsize);
+    TRACE1("=== Text Relocation ===\n");
     load2td(ctrel, tout, trout);
 
     off1 = D_OFFSET(filhdr);
