@@ -48,10 +48,10 @@ for dir in "$path"*; do
     #     echo $f
     #     $REL $f
     # done
-    # cecho "ld => obj:"
-    # $LD -r -o out.obj *.out
-    # cecho "ld => bin:"
-    # $LD -o out.bin *.out
+    cecho "ld => obj:"
+    $LD -rso out.obj *.out
+    cecho "ld => bin:"
+    $LD -o out.bin *.out
     popd 1>/dev/null
 done
 

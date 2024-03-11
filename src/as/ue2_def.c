@@ -197,7 +197,7 @@ struct instab instab[] = {
 
 /* {Arguments, Size, Token [, Token ...], 0 [, Params ] } */
 /* { ArgumentsBitfield, Size, Identifier # [ Token .. ], 0}*/
-struct modexpr m_rc[] = {
+/*struct modexpr m_rc[] = {
     {0b10000000, 1, 1, IEXPR, TNL, 0}
-};
+};*/
 

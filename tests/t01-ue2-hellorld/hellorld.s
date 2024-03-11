@@ -1,4 +1,5 @@
-.set Z, 1
+.set C, 1
+.set Z, 2
 .set TX, 0xffc
 
 loop:
@@ -8,8 +9,8 @@ done:
     bz      done         ; keep spinning in place
     stl     TX
     lda     1
-    adc     loop ; adc     loop+1
-    stl     loop ; stl     loop+1
+    adc     loop+1
+    stl     loop+1
     
     scf     Z
     bz      loop

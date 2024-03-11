@@ -142,7 +142,7 @@ cp8c(from, to) uint8_t *from, *to;
 
     f = from;
     t = to;
-    te = t + 8;
+    te = t + NCPS;
     while ((*t++ = *f++) && t < te)
         ;
     while (t < te)
@@ -949,7 +949,7 @@ setupout()
         drout = tcreat(&droutn, "l_rdata_X");
     }
     /*ORIG: filhdr.magic = nflag? A_MAGIC1:A_MAGIC2;*/
-    filhdr.magic = A_MAGIC1;
+    filhdr.magic = A_MAGIC2;
     /*if (zflag)
         filhdr.magic = nflag?0413:0412;
     filhdr.tsize = nflag? tsize:tsize;

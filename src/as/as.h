@@ -15,7 +15,6 @@ struct exp
 	uint8_t xtype;
 	uint8_t xloc;
 	uint16_t xvalue;
-	uint16_t yvalue; /* 2nd half of double floating */
 	struct symtab *xname;
 } PACKED;
 
@@ -59,8 +58,8 @@ struct modexpr {
 #define TSTR 29
 #define TNAME 30
 #define TINTSTR 31
+#define LOBYTE 31
 
-#define IEXPR 32
 /* Pseudo instruction types */
 #define ISPACE ((char)(1 + 32))
 #define IBYTE ((char)(2 + 32))
@@ -82,7 +81,11 @@ struct modexpr {
 #define ILCOMM ((char)(11 + 32))
 #define IREG ((char)(12 + 32))
 /*#define IBREG ((char)(13 + 32))*/
+#define ILOB ((char)(14 + 32))
+#define IHIB ((char)(15 + 32))
 
+
+#define ERR (-1)
 
 /*#define ERR (-1)*/
 /*#define NBPW 32 *//* Bits per word */

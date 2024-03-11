@@ -30,22 +30,22 @@ char tasfilen[] = "outsegXXX";
 FILE *txtfil;
 FILE *relfil;
 
-char passno = 1;
+uint8_t passno = 1;
 struct symtab *hshtab[NHASH];
-int hshused = 0;
-int tsize;
-int dsize;
-int tok;
+uint16_t hshused = 0;
+uint16_t tsize;
+uint16_t dsize;
+uintptr_t tok;
 
 /*struct symtab symtab[1000];*/
 struct symtab *symtab;
 struct symtab *symcur;
 struct symtab *symend;
 struct symtab *lastnam;
-int nsyms; /*number in the symbol table*/
-char strval[NCPS + 2];
+uint16_t nsyms; /*number in the symbol table*/
+uint8_t strval[NCPS + 2];
 
-int seg_number;
+uint8_t seg_number;
 struct exp usedot[NLOC + NLOC];
 FILE *usefile[NLOC + NLOC];
 FILE *rusefile[NLOC + NLOC];
@@ -54,8 +54,8 @@ struct exp args[6];
 
 uintptr_t lexval;
 
-int reflen[] = {0, 0, 1, 1, 2, 2, 4, 4, 8, 8}; /* length of relocation value */
-int datbase = 0;                               /* base of the data segment */
+uint8_t reflen[] = {0, 0, 1, 1, 2, 2, 4, 4, 8, 8}; /* length of relocation value */
+uint16_t datbase = 0;                              /* base of the data segment */
 
 error(char *format, ...)
 {
@@ -178,6 +178,21 @@ loop:
         goto ret;
     case TSPACE:
         goto loop;
+    case TLSH:
+        tok = (type + 1)[c = getchar()];
+        if (tok != TLSH)
+        {
+            ungetc(c, stdin);
+            tok = ILOB;
+        }
+        break;
+    case TRSH:
+        tok = (type + 1)[c = getchar()];
+        if (tok != TLSH)
+        {
+            ungetc(c, stdin);
+            tok = IHIB;
+        }
     case TSQ:
         intval = getchar();
         tok = (type + 1)[c = getchar()];
@@ -304,6 +319,14 @@ ret:
 done:
 }
 
+uintptr_t
+lexpeek()
+{
+    int t = getchar();
+    ungetc(t, stdin);
+    return t;
+}
+
 lex()
 {
     tok = getchar();
@@ -333,17 +356,137 @@ lex()
     return tok;
 }
 
+/*
+ * Tables for combination of operands.
+ */
+/* clang-format off */
+/* table for + */
+uint8_t pltab[6][6] = {
+/*	UND	ABS	TXT	DAT	BSS	EXT */
+/*UND*/	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,
+/*ABS*/	XUNDEF,	XABS,	XTEXT,	XDATA,	XBSS,	XXTRN,
+/*TXT*/	XUNDEF,	XTEXT,	ERR,	ERR,	ERR,	ERR,
+/*DAT*/	XUNDEF,	XDATA,	ERR,	ERR,	ERR,	ERR,
+/*BSS*/	XUNDEF,	XBSS,	ERR,	ERR,	ERR,	ERR,
+/*EXT*/	XUNDEF,	XXTRN,	ERR,	ERR,	ERR,	ERR,
+};
+
+/* table for - */
+uint8_t mintab[6][6] = {
+/*	UND	ABS	TXT	DAT	BSS	EXT */
+/*UND*/	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,
+/*ABS*/	XUNDEF,	XABS,	ERR,	ERR,	ERR,	ERR,
+/*TXT*/	XUNDEF,	XTEXT,	XABS,	ERR,	ERR,	ERR,
+/*DAT*/	XUNDEF,	XDATA,	ERR,	XABS,	ERR,	ERR,
+/*BSS*/	XUNDEF,	XBSS,	ERR,	ERR,	XABS,	ERR,
+/*EXT*/	XUNDEF,	XXTRN,	ERR,	ERR,	ERR,	ERR,
+};
+
+/* table for other operators */
+uint8_t othtab[6][6] = {
+/*	UND	ABS	TXT	DAT	BSS	EXT */
+/*UND*/	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,	XUNDEF,
+/*ABS*/	XUNDEF,	XABS,	ERR,	ERR,	ERR,	ERR,
+/*TXT*/	XUNDEF,	ERR,	ERR,	ERR,	ERR,	ERR,
+/*DAT*/	XUNDEF,	ERR,	ERR,	ERR,	ERR,	ERR,
+/*BSS*/	XUNDEF,	ERR,	ERR,	ERR,	ERR,	ERR,
+/*EXT*/	XUNDEF,	ERR,	ERR,	ERR,	ERR,	ERR,
+};
+/* clang-format on */
+
+struct exp *
+combine(op, r1, r2)
+register struct exp *r1, *r2;
+{
+    register t1, t2, type, loc;
+
+    t1 = r1->xtype & XTYPE;
+    t2 = r2->xtype & XTYPE;
+    if (r1->xtype == XXTRN + XUNDEF)
+        t1 = XTXRN;
+    if (r2->xtype == XXTRN + XUNDEF)
+        t2 = XTXRN;
+    if (passno == 1)
+        if (r1->xloc != r2->xloc && t1 == t2)
+            t1 = t2 = XTXRN; /* error on != loc ctrs */
+    t1 >>= 1;
+    t2 >>= 1;
+    switch (op)
+    {
+
+    case TPLUS:
+        r1->xvalue += r2->xvalue;
+        type = pltab[t1][t2];
+        break;
+
+    case TMINUS:
+        r1->xvalue -= r2->xvalue;
+        type = mintab[t1][t2];
+        break;
+
+        /*case TIOR:
+            r1->xvalue |= r2->xvalue;
+            goto comm;
+
+        case TXOR:
+            r1->xvalue ^= r2->xvalue;
+            goto comm;
+
+        case TAND:
+            r1->xvalue &= r2->xvalue;
+            goto comm;*/
+
+    case TLSH:
+        r1->xvalue <<= r2->xvalue;
+        goto comm;
+    case TRSH:
+        r1->xvalue >>= r2->xvalue;
+        goto comm;
+        /*
+        case TTILDE:
+            r1->xvalue |= ~r2->xvalue;
+            goto comm;*/
+
+    case TMUL:
+        r1->xvalue *= r2->xvalue;
+        goto comm;
+
+    case TDIV:
+        if (r2->xvalue == 0)
+            error("Divide check");
+        else
+            r1->xvalue /= r2->xvalue;
+        goto comm;
+    comm:
+        type = othtab[t1][t2];
+        break;
+    default:
+        error("Internal error: unknown operator");
+    }
+    if (t2 == (XTXRN >> 1))
+        r1->xname = r2->xname;
+    r1->xtype = type | (r1->xtype | r2->xtype) & (XFORW | XXTRN);
+    if (type == ERR)
+        error("Relocation error");
+    return (r1);
+}
+
 parseex(e) struct exp *e;
 {
+    int peek;
     struct symtab *sp;
+    struct exp right;
+
+    tok = lex();
     e->xloc = 0;
-    e->yvalue = 0;
     e->xvalue = lexval;
-    if (tok == TNL)
+
+    if (tok == TLP)
     {
-        error("unexp nl");
+        parseex(e);
+        expect(TRP, ')');
     }
-    if (tok == TINT)
+    else if (tok == TINT)
     {
         e->xtype = XABS;
         e->xname = NULL;
@@ -359,11 +502,37 @@ parseex(e) struct exp *e;
     }
     else
     {
+        error("exp invalid");
+    }
+    if (tok == TNL)
+    {
         return 0;
     }
+
+    peek = lexpeek();
+    if (peek == TMUL || peek == TDIV)
+    {
+        lex();
+        parseex(&right);
+        combine(peek, e, &right);
+    }
+    else if (peek == TLSH || peek == TRSH)
+    {
+        lex();
+        parseex(&right);
+        combine(peek, e, &right);
+    }
+    else if (peek == TPLUS || peek == TMINUS)
+    {
+        lex();
+        parseex(&right);
+        combine(peek, e, &right);
+    }
+
     return 1;
 }
 
+#if 0
 parseargs(def, len) struct modexpr *def;
 {
     int i;
@@ -425,6 +594,7 @@ parseargs(def, len) struct modexpr *def;
     }
     return NULL;
 }
+#endif
 
 outb(val)
 {
@@ -580,7 +750,91 @@ parse()
                 xtrab = 0;
                 switch (ins->access)
                 {
-#include "ue2_impl.c"
+                case MNONE:
+                    if (passno == 1)
+                    {
+                        dotp->xvalue += 2;
+                    }
+                    else
+                    {
+                        outb(ins->opcode << 4);
+                        outb(0);
+                    }
+                    break;
+                case MIMM:
+                    if (passno == 1)
+                    {
+                        if (!parseex(&args[0]))
+                        {
+                            error("unexp arg");
+                        }
+                        dotp->xvalue += 2;
+                    }
+                    else
+                    {
+                        if (!parseex(&args[0]))
+                        {
+                            error("unexp arg");
+                        }
+                        xtrab = LEN1;
+                        rel = args[0].xvalue;
+                        outb(ins->opcode << 4);
+                        if (args[0].xtype == XABS)
+                        {
+                            /* yaros: todo: add range check [0,255]*/
+                            TRACE1("0x%04x: ABS %d\n", dotp->xvalue, rel);
+                        }
+                        else
+                        {
+                            sym = args[0].xname;
+                            TRACE1("0x%04x: IMMREL %s=%d %d\n", dotp->xvalue, sym->name, sym->value, sym->type);
+                            /*sym = args[0].xname; unused, debug*/
+                        }
+                        outrel(&args[0].xvalue, LEN1, args[0].xtype, args[0].xname);
+                        /*
+                        no relative things
+                        if (rel > int_max || rel < -127)
+                        {
+                            error("out of range");
+                        }*/
+                    }
+                    break;
+                case MABS:
+                    if (passno == 1)
+                    {
+                        dotp->xvalue += 2;
+                        if (!parseex(&args[0]))
+                        {
+                            error("unexp arg");
+                        }
+                    }
+                    else
+                    {
+                        if (!parseex(&args[0]))
+                        {
+                            error("unexp arg");
+                        }
+                        xtrab = LEN2;
+                        rel = args[0].xvalue;
+                        sym = args[0].xname;
+                        TRACE1("rel on line %d = %d\n", lineno, rel);
+                        TRACE1("0x%04x: ABSREL %s=%d %d\n", dotp->xvalue, sym->name, sym->value, sym->type);
+                        /*if (rel > 128 || rel < -127)
+                        {
+                            error("out of range");
+                        }*/
+                        /*outb(ins->opcode);
+                        outb(rel);*/
+                        i = (args[0].xvalue & 0xfff) | (ins->opcode << 12);
+                        outrel(&i, LEN2, args[0].xtype, args[0].xname);
+
+                        /*fwrite(&ins->opcode, sizeof(ins->opcode), 1, txtfil);
+                        fwrite(&rel, 1, 1, txtfil);*/
+                    }
+                    break;
+                default:
+                    error("unexpented");
+                    break;
                 }
                 /*while ((tok = lex()) != TNL)
                 {
@@ -891,6 +1145,7 @@ char **argv;
     /*
      * PASS 0
      */
+    puts("pass 0");
     /* temp file for scan result */
     mkfile(0, 's');
     txtfil = fopen(tasfilen, "wb");
@@ -916,6 +1171,7 @@ char **argv;
     /*
      * PASS 1
      */
+    puts("pass 1");
     lineno = 1;
     passno = 1;
     freopen(tasfilen, "rb", stdin);
@@ -1000,7 +1256,7 @@ char **argv;
     hdr.tsize = tsize;
     hdr.ssize = sizesymtab();
     dumpsym();
-
+    puts("pass 2");
     /*
      PASS 2
     */

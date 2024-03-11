@@ -8,7 +8,7 @@
 #define PACKED
 #endif
 
-#define NCPS 8 /* length of label/symbol */
+#define NCPS 32 /* length of label/symbol */
 #define ADDRTYPE uint16_t
 #define MAXADDR ((1 << 12) - 1) /* yaros todo: move to ue2.h */
 
