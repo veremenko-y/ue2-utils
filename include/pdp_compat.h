@@ -1,5 +1,5 @@
-#ifndef _STDINT_H
-#define _STDINT_H
+#ifndef PDP_COMPAT
+#define PDP_COMPAT
 
 typedef char   uint8_t;
 #define INT8_MAX        127
@@ -17,6 +17,13 @@ typedef long   uint32_t;
 #define INT32_MIN       (-2147483648)
 #define UINT32_MAX      4294967295
 
-typedef int uintptr_t;
+typedef unsigned uintptr_t;
+typedef int size_t;
+
+#define SEEK_SET	0	/* Seek from beginning of file.  */
+#define SEEK_CUR	1	/* Seek from current position.  */
+#define SEEK_END	2	/* Seek from end of file.  */
+
+#define PACKED
 
 #endif

@@ -1,0 +1,7 @@
+cd as
+make
+cd ..
+cc -i -s -O -Iinclude ld.c -o ue2-ld
+cc -n -s -O -Iinclude nm.c -o ue2-nm
+cc -n -s -O -Iinclude rel.c -o ue2-rel
+cc -n -s -O -Iinclude size.c -o ue2-size

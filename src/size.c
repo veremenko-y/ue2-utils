@@ -1,5 +1,4 @@
 #include <stdio.h>
-/*#include 	<a.out.h>*/
 #include <obj.h>
 
 /*
@@ -7,7 +6,6 @@
 */
 
 int a_magic[] = {A_MAGIC1, A_MAGIC2, A_MAGIC3, A_MAGIC4, 0};
-
 
 print2(name, size)
 uint8_t *name;
@@ -93,7 +91,7 @@ main(argc, argv) char **argv;
 		print2("rdata off", DREL_OFFSET(buf));
 		print2("sym off", SYM_OFFSET(buf));
 
-		fseek(f, 0, SEEK_END);
+		fseek(f, 0L, SEEK_END);
 		i = ftell(f);
 		if (i != sum)
 		{

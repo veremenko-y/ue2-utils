@@ -1,23 +1,25 @@
 /*
-**	print symbol tables for
-**	object or archive files
+**      print symbol tables for
+**      object or archive files
 **
-**	nm [-goprun] [name ...]
+**      nm [-goprun] [name ...]
 */
 
-
-
-/*#include	<ar.h>
-#include	<a.out.h>*/
-#include "ar.h"
+#include <stdio.h>
+#include <ctype.h>
 #include <obj.h>
-#include	<stdio.h>
-#include <stdlib.h>
-#include	<ctype.h>
+
+#ifdef __GNUC__
+#include <ue2-ar.h>
+#else
+#include <ar.h>
+#endif
+
 #define	MAGIC	exp.magic
 #define	BADMAG	MAGIC!=A_MAGIC1 && MAGIC!=A_MAGIC2  \
 		&& MAGIC!=A_MAGIC3 && MAGIC!=A_MAGIC4
 #define	SELECT	arch_flg ? arp.ar_name : *argv
+
 int	numsort_flg;
 int	undef_flg;
 int	revsort_flg = 1;

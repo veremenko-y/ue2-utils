@@ -1,12 +1,20 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
 #include <obj.h>
-#include "ar.h"
-#include "dbg.h"
+#include <ue2-ar.h>
+#include <dbg.h>
 
-void error(char *format, ...);
+#ifndef __GNUC__
+#include <varargs.h>
+#endif
+
+error(format, args) char *format;
+va_list *args;
+{
+    fprintf(stderr, "error: ");
+    fprintf(stderr, format, args);
+    fprintf(stderr, "\n");
+    exit(2);
+}
 
 /*
  * address reference types
@@ -85,7 +93,7 @@ struct stream
     int globsize;
     int pos;
     int len;
-    char tag[NCPS];
+    char xtag[NCPS];
 };
 
 struct stream text;
@@ -97,43 +105,40 @@ bswap16(w)
     *w = (*w << 8) | (*w >> 8);
 }
 
-char *printsym(sym)
+printsym(sym)
 struct symtab *sym;
 {
-    static char buf[1024];
-    char *t = buf;
-    t += sprintf(t, "\t'%s'[idx: %d] type=%d (", sym->name, sym->index, sym->type);
+    printf("\t'%s'[idx: %d] type=%d (", sym->name, sym->index, sym->type);
     if (sym->type == 0)
-        t += sprintf(t, " XUNDEF ");
+        printf(" XUNDEF ");
     if ((sym->type & XABS) == XABS)
-        t += sprintf(t, " XABS ");
+        printf(" XABS ");
     if ((sym->type & XDATA) == XDATA)
-        t += sprintf(t, " XDATA ");
+        printf(" XDATA ");
     if ((sym->type & XTEXT) == XTEXT)
-        t += sprintf(t, " XTEXT ");
+        printf(" XTEXT ");
     if ((sym->type & XBSS) == XBSS)
-        t += sprintf(t, " XBSS ");
+        printf(" XBSS ");
     if ((sym->type & XDATAO) == XDATAO)
-        t += sprintf(t, " XDATAO ");
+        printf(" XDATAO ");
     if ((sym->type & XBSSO) == XBSSO)
-        t += sprintf(t, " XBSSO ");
+        printf(" XBSSO ");
     if ((sym->type & XTEXTO) == XTEXTO)
-        t += sprintf(t, " XTEXTO ");
+        printf(" XTEXTO ");
     if ((sym->type & XABSO) == XABSO)
-        t += sprintf(t, " XABSO ");
+        printf(" XABSO ");
     if ((sym->type & XUNDEFO) == XUNDEFO)
-        t += sprintf(t, " XUNDEFO ");
+        printf(" XUNDEFO ");
     if ((sym->type & XTXRN) == XTXRN)
-        t += sprintf(t, " XTXRN ");
+        printf(" XTXRN ");
     if ((sym->type & XXTRN) == XXTRN)
-        t += sprintf(t, " XXTRN ");
+        printf(" XXTRN ");
     if ((sym->type & XTYPE) == XTYPE)
-        t += sprintf(t, " XTYPE ");
+        printf(" XTYPE ");
     if ((sym->type & XFORW) == XFORW)
-        t += sprintf(t, " XFORW ");
-    t += sprintf(t, ") val=0x%x\n", sym->value);
-    *t = '\0';
-    return buf;
+        printf(" XFORW ");
+    printf(") val=0x%x\n", sym->value);
+    printf("\n");
 }
 
 cp8c(from, to) uint8_t *from, *to;
@@ -150,11 +155,13 @@ cp8c(from, to) uint8_t *from, *to;
 }
 
 dseek(sp, loc, size) struct stream *sp;
-uint16_t loc;
+uint32_t loc;
 uint16_t size;
 {
-    TRACE1("[%s] seeking to 0x%04x.0x%04x\n", sp->tag, loc, size);
-    fseek(sp->file, loc, SEEK_SET);
+    int r;
+    TRACE1("[%s] seeking to 0x%04X.0x%04x\n", sp->xtag, loc, size);
+    r = fseek(sp->file, loc, SEEK_SET);
+    TRACE1("seek result %d\n");
     sp->globpos = loc;
     if (size != -1)
     {
@@ -162,7 +169,7 @@ uint16_t size;
         sp->len = size;
         if ((sp->globsize - sp->globpos) < size)
         {
-            error("failed to seek for %s", sp->tag);
+            error("failed to seek for %s", sp->xtag);
         }
     }
     else
@@ -175,16 +182,20 @@ uint16_t size;
 getfile(cp) uint8_t *cp;
 {
     FILE *f;
+    TRACE1("opening1 %s\n", cp);
     if ((f = fopen(cp, "r")) == 0)
     {
         error("cannot open %s", cp);
     }
     text.file = f;
     text.globpos = 0;
-    fseek(f, 0, SEEK_END);
+    fseek(f, 0L, SEEK_END);
     text.globsize = ftell(f);
-    strcpy(text.tag, "text");
-    fseek(f, 0, SEEK_SET);
+    TRACE1("globsize1 %d\n", text.globsize);
+    strcpy(text.xtag, "text");
+    fseek(f, 0L, SEEK_SET);
+
+    TRACE1("opening2 %s\n", cp);
     if ((f = fopen(cp, "r")) == 0)
     {
         error("cannot open %s", cp);
@@ -192,7 +203,8 @@ getfile(cp) uint8_t *cp;
     reloc.file = f;
     reloc.globpos = 0;
     reloc.globsize = text.globsize;
-    strcpy(reloc.tag, "reloc");
+    TRACE1("globsize2 %d\n", reloc.globsize);
+    strcpy(reloc.xtag, "reloc");
     /* always not library */
     return 0;
 }
@@ -203,8 +215,8 @@ struct stream *sp;
     size_t r;
     uint8_t c;
 
-    TRACE3("[%s] pos=0x%04x (%d) len=%d\n", sp->tag, sp->pos, sp->pos, sp->len);
-    TRACE3("[%s] globpos=0x%04x (%d) globsize=%d\n", sp->tag, sp->globpos, sp->globpos, sp->globpos);
+    TRACE3("[%s] pos=0x%04x (%d) len=%d\n", sp->xtag, sp->pos, sp->pos, sp->len);
+    TRACE3("[%s] globpos=0x%04x (%d) globsize=%d\n", sp->xtag, sp->globpos, sp->globpos, sp->globpos);
     if (sp->len < 1)
     {
         error("get: stream overflow");
@@ -225,7 +237,7 @@ struct stream *sp;
 {
     size_t r;
     uint16_t c;
-    TRACE3("[%s] pos=%04x (%d) len=%d\n", sp->tag, sp->pos, sp->pos, sp->len);
+    TRACE3("[%s] pos=%04x (%d) len=%d\n", sp->xtag, sp->pos, sp->pos, sp->len);
     if (sp->len < 2)
     {
         error("get16: stream overflow");
@@ -249,9 +261,15 @@ struct stream *sp;
     int r;
     if (sp->len < n)
     {
-        error("invalid offset or size for %s", sp->tag);
+        error("invalid offset or size for %s", sp->xtag);
     }
     r = fread(dest, 1, n, sp->file);
+    TRACE1("Read %d bytes out of %d\n", r, n);
+    if(r == 0) {
+        r = ftell(sp->file);
+        TRACE1("cur pos of %d is %d\n", sp->file, r);
+        error("failed to read %s", sp->xtag);
+    }
     sp->pos += r;
     sp->len -= r;
     sp->globpos += r;
@@ -267,6 +285,7 @@ uint16_t size;
 }
 
 readhdr(off)
+uint32_t off;
 {
     dseek(&text, off, sizeof(filhdr));
     mget(&filhdr, sizeof(filhdr), &text);
@@ -402,14 +421,16 @@ lookup()
 }
 
 load1(libflg, off)
+uint32_t off;
 {
-    long loc;
+    uint16_t loc;
     int r;
     int ndef;
     struct symtab *sp;
     struct symtab *save;
     readhdr(off);
     loc = off + SYM_OFFSET(filhdr);
+    TRACE1("Seeking to %d\n", loc);
     dseek(&text, loc, filhdr.ssize);
     save = symcur;
 
@@ -422,13 +443,13 @@ load1(libflg, off)
     while (text.len > 0)
     {
         mget(&cursym, sizeof(cursym), &text);
+        printsym(&cursym);
         if ((cursym.type & XXTRN) == 0)
         {
             continue;
         }
         TRACE1("searching\n");
         symreloc();
-        dumpsymone(&cursym);
         if (enter(lookup(1)))
         {
             /* new symbol, keep going*/
@@ -436,7 +457,7 @@ load1(libflg, off)
         }
         sp = lastsym;
         TRACE1("found\n");
-        dumpsymone(sp);
+        /*dumpsymone(sp);*/
         if (sp->type != XXTRN + XUNDEF)
         {
             TRACE1("not xxtrn\n");
@@ -459,8 +480,8 @@ load1(libflg, off)
         ndef++;
         sp->type = cursym.type;
         sp->value = cursym.value;
-        dumpsymone(sp);
-        dumpsymone(&cursym);
+        /*dumpsymone(sp);*/
+        /*dumpsymone(&cursym);*/
     }
     if (libflg == 0 || ndef)
     {
@@ -506,7 +527,7 @@ load1arg(cp) char *cp;
     int noff, nbno;
     if (getfile(cp) == 0)
     {
-        load1(0, 0, 0);
+        load1(0, 0L);
     }
     /*nbno = 0;
     noff = 1;
@@ -539,15 +560,16 @@ load2arg(cp)
     int noff, nbno;
     if (getfile(cp) == 0)
     {
-        load2(0, 0);
+        load2(0, 0L);
     }
     fclose(text.file);
     fclose(reloc.file);
 }
 
 load2(libflg, off)
+uint32_t off;
 {
-    long loc;
+    uint32_t loc;
     int off1, off2;
     struct symtab *sp;
     int16_t symno;
@@ -572,7 +594,7 @@ load2(libflg, off)
         mget(&cursym, sizeof(cursym), &text);
         symreloc();
         TRACE1("Cur\n");
-        dumpsymone(&cursym);
+        /*dumpsymone(&cursym);*/
         if ((cursym.type & XXTRN) == 0)
         {
             continue;
@@ -582,7 +604,7 @@ load2(libflg, off)
             error("unexp symbol");
         }
         TRACE1("Found\n");
-        dumpsymone(sp);
+        /*dumpsymone(sp);*/
         if (cursym.type == XXTRN + XUNDEF)
         {
             sp->index = symno;
@@ -591,8 +613,8 @@ load2(libflg, off)
         if (cursym.type != sp->type ||
             cursym.value != sp->value)
         {
-            printf(printsym(&cursym));
-            printf(printsym(sp));
+            /*printf(printsym(&cursym));
+            printf(printsym(sp));*/
             error("mul def %s", sp->name);
         }
     }
@@ -638,7 +660,7 @@ FILE *f, *frel;
         /* simply copy segment if no relocation found */
         if (reloc.len == 0)
         {
-            TRACE1("Dumping rest of text of %s. Remaining %d bytes\n", text.tag, reloc.len);
+            TRACE1("Dumping rest of text of %s. Remaining %d bytes\n", text.xtag, reloc.len);
             while (text.len)
             {
                 putc(get(&text), f);
@@ -705,7 +727,7 @@ FILE *f, *frel;
             else
             {
                 TRACE1("type is %02x\n", lastsym->type);
-                dumpsymone(lastsym);
+                /*dumpsymone(lastsym);*/
                 if (lastsym->type == XXTRN + XDATA && type & ROFF)
                 {
                     sym = XDATAO;
@@ -852,7 +874,7 @@ middle()
     for (sp = symtab; sp < symcur; sp++)
     {
         TRACE1("final\n");
-        dumpsymone(sp);
+        /*dumpsymone(sp);*/
         switch (sp->type & XTYPE)
         {
         case XXTRN + XUNDEF:
@@ -1049,11 +1071,11 @@ delexit()
     exit(delarg);
 }
 
+/*
 dumpsymone(sym) struct symtab *sym;
 {
     TRACE1(printsym(sym));
 }
-
 dumpsym()
 {
     int i;
@@ -1075,17 +1097,7 @@ dumpsym()
         }
     }
 }
-
-void error(char *format, ...)
-{
-    fprintf(stderr, "error: ");
-    va_list argp;
-    va_start(argp, format);
-    vfprintf(stderr, format, argp);
-    va_end(argp);
-    fprintf(stderr, "\n");
-    exit(1);
-}
+*/
 
 main(argc, argv) int argc;
 char **argv;
@@ -1100,6 +1112,8 @@ char **argv;
 
     symcur = symtab = sbrk(200 * sizeof(struct symtab));
     symend = sbrk(0);
+
+    ctrel = cdrel = cbrel = 0;
 
     puts("pass 1");
     /* pass 1 */
@@ -1170,56 +1184,7 @@ char **argv;
     }
 
     finishout();
-    dumpsym();
+    /*dumpsym();*/
     delarg = errlev;
     delexit();
 }
-
-/*
--s  `squash'  the  output,  that is, remove the symbol table
-    and relocation bits to save space (but impair  the  use-
-    fulness  of the debugger).  This information can also be
-    removed by strip.
-
--u  take the following argument as a symbol and enter it  as
-    undefined in the symbol table.  This is useful for load-
-    ing wholly from a library, since  initially  the  symbol
-    table  is empty and an unresolved reference is needed to
-    force the loading of the first routine.
-
--l  This option is an abbreviation for a library  name.   -l
-    alone  stands  for  `/lib/liba.a', which is the standard
-    system library  for  assembly  language  programs.   -lx
-    stands  for  `/lib/libx.a'  where x is any character.  A
-    library is searched when its name is encountered, so the
-    placement of a -l is significant.
-
--x  do not preserve local (non-.globl) symbols in the output
-    symbol table; only enter external symbols.  This  option
-    saves some space in the output file.
-
--X  Save  local  symbols  except for those whose names begin
-    with `L'.  This option is used by cc to  discard  inter-
-    nally  generated labels while retaining symbols local to
-    routines.
-
--r  generate relocation bits in the output file so  that  it
-    can  be  the  subject of another ld run.  This flag also
-    prevents final definitions from being  given  to  common
-    symbols,  and suppresses the `undefined symbol' diagnos-
-    tics.
-
--d  force definition of common storage even if the  -r  flag
-    is present.
-
--n  Arrange  that when the output file is executed, the text
-    portion will be read-only and shared among all users ex-
-    ecuting  the  file.  This involves moving the data areas
-    up the the first possible 4K word boundary following the
-    end of the text.
-
--i  When  the  output file is executed, the program text and
-    data areas will live in separate  address  spaces.   The
-    only  difference between this option and -n is that here
-    the data starts at location 0.
-*/

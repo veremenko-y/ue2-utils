@@ -5,16 +5,21 @@
 **	nm [-goprun] [name ...]
 */
 
-/*#include	<ar.h>
-#include	<a.out.h>*/
-#include "ar.h"
-#include <obj.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
+
+#include <obj.h>
+
+#ifdef __GNUC__
+#include <ue2-ar.h>
+#else
+#include <ar.h>
+#include <varargs.h>
+#endif
+
 #define MAGIC exp.magic
 #define BADMAG MAGIC != A_MAGIC1 &&MAGIC != A_MAGIC2 &&MAGIC != A_MAGIC3 &&MAGIC != A_MAGIC4
 #define SELECT arch_flg ? arp.ar_name : *argv
+
 int arch_flg;
 struct ar_hdr arp;
 struct hdr exp;
@@ -62,7 +67,7 @@ main(argc, argv) char **argv;
 		}
 		do
 		{
-			int o;
+			long o;
 			int i, n, c;
 			struct symtab *symp = NULL;
 			struct symtab sym;

@@ -1,5 +1,7 @@
 /* UNIX Reasearch V7*/
+
 #define	ARMAG	0177545
+
 struct	ar_hdr {
 	char	ar_name[14];
 	int		ar_date;

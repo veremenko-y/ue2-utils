@@ -1,0 +1,5 @@
+cp as/ue2-as /usr/bin/ue2-as
+cp ue2-ld /usr/bin/ue2-ld
+cp ue2-rel /usr/bin/ue2-rel
+cp ue2-size /usr/bin/ue2-size
+cp ue2-nm /usr/bin/ue2-nm

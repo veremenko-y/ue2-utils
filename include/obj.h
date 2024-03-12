@@ -2,14 +2,16 @@
 #define OBJ_H
 
 #ifdef __GNUC__
-#define PACKED __attribute__((packed))
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
 #include <stdint.h>
+#define PACKED __attribute__((packed))
 #else
-#define PACKED
-#include "pdp11_stdint.h"
+#include <pdp_compat.h>
 #endif
 
-#define NCPS 32 /* length of label/symbol */
+#define NCPS 8 /* length of label/symbol */
 #define ADDRTYPE uint16_t
 #define MAXADDR ((1 << 12) - 1) /* yaros todo: move to ue2.h */
 

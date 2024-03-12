@@ -17,6 +17,6 @@ done:
 
 .data
 hellorld:
-    .byte      "\nHellorld"
+    .byte      "Hellorld"
 zero:
     .byte      0

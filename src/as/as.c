@@ -1,15 +1,15 @@
 #include <stdio.h>
-#ifdef __GNUC__
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#else
+
+#ifndef __GNUC__
 #include <varargs.h>
 #endif
 
+#include <obj.h>
+#include <ue2-ar.h>
+#include <dbg.h>
+
 #include "as.h"
 #include "ue2.h"
-#include "dbg.h"
 
 struct hdr hdr = {
     0410,

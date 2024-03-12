@@ -3,7 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
-#include "ar.h"
+#include <ue2-ar.h>
 struct	stat	stbuf;
 struct	ar_hdr	arbuf;
 
