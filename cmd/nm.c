@@ -103,6 +103,8 @@ main(argc, argv) char **argv;
         {
             off_t o;
             register i, n, c;
+            char is_const;
+            char is_conexport;
             struct sym *symp = NULL;
             struct sym sym;
 
@@ -110,13 +112,11 @@ main(argc, argv) char **argv;
             if (hdr.magic != MAGIC) /* archive element not in  */
                 continue;           /* proper format - skip it */
             o = hdr.textsize + hdr.datasize;
-            printf("size %d\n", o);
             if (hdr.hasrel)
             {
                 o <<= 1;
             }
-            printf("size %d\n", o);
-            fseek(fi, o, SEEK_CUR);
+            fseek(fi, SYMOFFSET(hdr), SEEK_SET);
             n = hdr.symsize;
             if (n == 0)
             {
@@ -126,11 +126,11 @@ main(argc, argv) char **argv;
             i = 0;
             while (--n >= 0)
             {
-                fread((char *)&sym, 1, sizeof(sym), fi);
+                fread(&sym, 1, sizeof(sym), fi);
                 if (globl_flg && (sym.type & SYMEXPORT) == 0)
                     continue;
                 c = 0;
-                switch (sym.type & SYMTYPE)
+                switch (sym.type & SYMTYPE & ~(SYMCONST))
                 {
                 case SYMUNDEF:
                     c = 'u';
@@ -147,12 +147,10 @@ main(argc, argv) char **argv;
                 }
                 if (undef_flg && c != 'u')
                     continue;
-                if (sym.type & SYMCONST)
-                {
-                    c = 'O';
-                }
-                if (sym.type & SYMEXPORT)
+                if ((sym.type & SYMEXPORT) )/* || (sym.type && SYMCOEXPORT)) */
                     c = toupper(c);
+                is_const = sym.type & SYMCONST;
+                is_conexport = sym.type & SYMCOEXPORT;
                 sym.type = c;
                 switch (sym.segm)
                 {
@@ -168,6 +166,14 @@ main(argc, argv) char **argv;
                 default:
                     c = '@';
                     break;
+                }
+                if(is_const)
+                {
+                    c = 'c';
+                    sym.name[0] = '#';
+                }
+                if(is_conexport) {
+                    c = toupper(c);
                 }
                 sym.segm = c;
                 if (symp == NULL)
@@ -198,11 +204,14 @@ main(argc, argv) char **argv;
                 c = symp[n].type;
                 if (!undef_flg)
                 {
-                    if (c == 'u' || c == 'U')
+                    if ((c == 'u' || c == 'U') && symp[n].value == 0)
                         printf("      ");
                     else
                         printf("%.6x", symp[n].value);
                     printf(" %c %c ", c, symp[n].segm);
+                    if(nosort_flg) {
+                        printf("[$%04x] ", n);
+                    }
                 }
                 printf("%.8s", symp[n].name);
 

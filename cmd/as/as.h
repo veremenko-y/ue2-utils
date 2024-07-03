@@ -44,7 +44,7 @@ extern FILE *fout;
 extern FILE *segout[4];
 extern uint8_t passno;
 extern uint16_t lineno;
-
+extern char *outname;
 
 /* as0 */
 extern struct sym *syms;
@@ -52,9 +52,10 @@ extern struct sym *cursym;
 extern uint16_t cursymn;
 extern uint16_t symscnt;
 extern uint16_t symstart;
+extern char strbuf[NAMESZ + 1];
 
 /* as1 */
-extern uint16_t segsize[3];
+extern uint16_t segsize[4];
 
 extern error(format, args);
 

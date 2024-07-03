@@ -8,7 +8,7 @@
 #define DBG_TRACE 3
 
 #ifndef LOG
-#define LOG DBG_DEBUG
+#define LOG DBG_INFO
 #endif
 
 
@@ -28,7 +28,7 @@
 #define DBG(...)
 #endif
 
-#if LOG >= DBG_NONE
+#if LOG >= DBG_TRACE
 #define TRACE printf
 #define TRACEEN
 #else

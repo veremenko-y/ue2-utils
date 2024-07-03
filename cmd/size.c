@@ -53,9 +53,10 @@ main(argc, argv) char **argv;
         printf("total: %u (0x%04x)\n\n", sum);
 
         puts("===aux===");
+        print2("header", sizeof(struct header));
+            print2("const", buf.consize);
         if (buf.hasrel)
         {
-            print2("header", sizeof(struct header));
             print2("rtext", buf.textsize);
             print2("rdata", buf.datasize);
         }

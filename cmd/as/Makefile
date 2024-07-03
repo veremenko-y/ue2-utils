@@ -2,9 +2,13 @@ include ../../common.mk
 
 CFLAGS += -I../../include
 
-.PHONY: all
+.PHONY: all test
 
 all: ue2-as
+
+test: all
+	./ue2-as hellorld.s -o hellorld.out && \
+	./ue2-as def.s -o def.out
 
 ue2-as: as0.o as1.o as2.o as.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@

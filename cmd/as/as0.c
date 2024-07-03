@@ -2,22 +2,22 @@
 #include "as.h"
 
 static struct sym ops[] = {
-    {"bz", STOKINS, MABS, 0 << 4},
-    {"bl", STOKINS, MABS, 1 << 4},
-    {"lda", STOKINS, MIMM, 2 << 4},
-    {"ldl", STOKINS, MABS, 3 << 4},
-    {"stl", STOKINS, MABS, 4 << 4},
-    {"jsr", STOKINS, MABS, 5 << 4},
-    {"strh", STOKINS, MABS, 6 << 4},
-    {"strl", STOKINS, MABS, 7 << 4},
-    {"rsr", STOKINS, MNONE, 8 << 4},
-    {"scf", STOKINS, MIMM, 9 << 4},
-    {"adc", STOKINS, MABS, 10 << 4},
-    {"cmp", STOKINS, MABS, 11 << 4},
-    {"ror", STOKINS, MABS, 12 << 4},
-    {"nand", STOKINS, MABS, 13 << 4},
-    {"ori", STOKINS, MABS, 14 << 4},
-    {"ore", STOKINS, MABS, 15 << 4},
+    {"bz", STOKINS, MIMM, 0 << 12},
+    {"bl", STOKINS, MIMM, 1 << 12},
+    {"lda", STOKINS, MABS, 2 << 12},
+    {"ldl", STOKINS, MIMM, 3 << 12},
+    {"stl", STOKINS, MIMM, 4 << 12},
+    {"jsr", STOKINS, MIMM, 5 << 12},
+    {"strh", STOKINS, MIMM, 6 << 12},
+    {"strl", STOKINS, MIMM, 7 << 12},
+    {"rsr", STOKINS, MNONE, 8 << 12},
+    {"scf", STOKINS, MABS, 9 << 12},
+    {"adc", STOKINS, MIMM, 10 << 12},
+    {"cmp", STOKINS, MIMM, 11 << 12},
+    {"ror", STOKINS, MIMM, 12 << 12},
+    {"nand", STOKINS, MIMM, 13 << 12},
+    {"ori", STOKINS, MIMM, 14 << 12},
+    {"ore", STOKINS, MIMM, 15 << 12},
     {".byte", STOKBYTE, 0, 0},
     {".word", STOKWORD, 0, 0},
     {".code", STOKTEXT, 0, 0},
@@ -35,14 +35,12 @@ uint16_t symscnt;
 uint16_t symstart;
 uint16_t cursymn;
 uint16_t symssize;
-uint16_t symuser;
 char strbuf[NAMESZ + 1];
 
 syminit()
 {
     symssize = 100;
     symscnt = symstart = sizeof(ops) / sizeof(ops[0]);
-    symuser = symscnt;
     syms = malloc(symssize * sizeof(struct sym));
     memcpy(syms, ops, sizeof(ops));
 }
@@ -68,6 +66,7 @@ symnew()
 {
     cursymn = symscnt;
     cursym = &syms[symscnt++];
+    cursym->segm = UINT8_MAX;
     if (symscnt >= symssize)
     {
         error("oo syms");
@@ -76,7 +75,7 @@ symnew()
 
 symdump()
 {
-#ifdef INFOEN
+#ifdef TRACEEN
     uint16_t i;
     INFO("Symbols:\n");
     for (i = 0; i < symscnt; i++)
@@ -109,7 +108,7 @@ symdump()
             case SYMUNDEF:
                 INFO("UNDEF ");
                 break;
-            case SYMABS:
+            case SYMIMM:
                 INFO("ABS ");
                 break;
             case SYMREL:

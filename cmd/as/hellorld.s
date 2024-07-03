@@ -1,25 +1,21 @@
-; set not supported yet
-.set C, 1
-.set Z, 2
-.set TX, 0xffc
+.import TX
+.import echo
 
 loop:
    ldl     hellorld
-   cmp     #3
+   cmp     #0
 done:
     bz      done         ; keep spinning in place
-    stl     TX
+    jsr echo
     lda     1
     ; expressions  not supported yet
     adc     loop ;+1
     stl     loop ;+1
-    adc     #loop
     
     scf     Z
-    jsr     reset
+    bz     loop
 
 .data
-    .res Z
 hellorld:
     .byte      "Hellorld"
 

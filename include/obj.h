@@ -21,20 +21,24 @@ struct sym
 } PACKED;
 
 /* Symbol types (for reloaction) */
-#define SYMUNDEF 0 /* undefined */
-#define SYMABS (1<<0) /* absolute value */
-#define SYMREL (1<<1) /* relative value */
+#define SYMUNDEF 0      /* undefined */
+#define SYMABS (1 << 0) /* absolute value */
+#define SYMREL (1 << 1) /* relative value */
+#define SYMCONST (1 << 2) /* constant value (to be emmited into data segment) */
 
-#define SYMTYPE (SYMABS | SYMREL)
+#define SYMTYPE (SYMABS | SYMREL | SYMCONST)
 
-#define SYMCONST (1 << 6) /* constant value (to be emmited into data segment) */
 #define SYMEXPORT (1 << 7)
+#define SYMCOEXPORT (1 << 6)
 
 /* Relocation types */
-/* #define RELFULL 0
-#define RELLO 1
-#define RELHI 2
-#define RELCONST 3 */
+#define RELCONST (1 << (7+8))
+#define RELSEGSHIFT (5+8)
+#define RELTEXT (1 << RELSEGSHIFT)
+#define RELDATA (2 << RELSEGSHIFT)
+#define RELBSS (3 << RELSEGSHIFT)
+#define RELSEG (RELTEXT | RELDATA | RELBSS)
+
 
 /* Segments */
 #define SEGTEXT 0
@@ -42,15 +46,30 @@ struct sym
 #define SEGBSS 2
 #define SEGCONST 3
 
-#define MAGIC 'U'
+#define MAGIC ((uint16_t)0x4d47)
+
 struct header
 {
-    uint8_t magic;
+    uint16_t magic;
     uint8_t hasrel;
     uint16_t textsize;
     uint16_t datasize;
     uint16_t bsssize;
+    uint8_t consize;
     uint16_t symsize;
 } PACKED;
+
+/* Offsets */
+
+#define SYMOFFSET(hdr)                  \
+    (                                   \
+        (hdr.textsize + hdr.datasize) * \
+            (hdr.hasrel ? 2 : 1) +      \
+        sizeof(hdr))
+    
+#define CODEOFFSET(hdr) (sizeof(hdr))
+#define RELCODEOFFSET(hdr) (sizeof(hdr) + hdr.textsize + hdr.datasize)
+
+
 
 #endif
