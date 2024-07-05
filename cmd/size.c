@@ -6,7 +6,7 @@
 */
 
 print2(name, size)
-uint8_t *name;
+    uint8_t *name;
 uint16_t size;
 {
     printf("%s: %d (0x%04x)\n", name, size, size);
@@ -14,7 +14,7 @@ uint16_t size;
 
 main(argc, argv) char **argv;
 {
-    struct header buf;
+    struct header hdr;
     int sum;
     int gorp, i;
     int symsize;
@@ -35,8 +35,8 @@ main(argc, argv) char **argv;
             printf("size: %s not found\n", *argv);
             continue;
         }
-        fread((char *)&buf, sizeof(buf), 1, f);
-        if (buf.magic != MAGIC)
+        fread((char *)&hdr, sizeof(hdr), 1, f);
+        if (IS_MAGIC_VALID(hdr.magic) == 0)
         {
             printf("size: %s not an object file\n", *argv);
             fclose(f);
@@ -44,45 +44,45 @@ main(argc, argv) char **argv;
         }
         if (gorp > 2)
             printf("\n%s: \n", *argv);
-        puts("===segments===");
-        printf("text: %u (0x%04x)\ndata: %u (0x%04x)\nbss: %u (0x%04x)\n",
-            buf.textsize, buf.textsize,
-            buf.datasize, buf.datasize,
-            buf.bsssize, buf.bsssize);
-        sum = buf.textsize + buf.datasize + buf.bsssize;
-        printf("total: %u (0x%04x)\n\n", sum);
+        /* puts("===segments==="); */
+        printf("text: %u (0x%04x) data: %u (0x%04x) bss: %u (0x%04x) ",
+               hdr.textsize, hdr.textsize,
+               hdr.datasize, hdr.datasize,
+               hdr.bsssize, hdr.bsssize);
+        sum = hdr.textsize + hdr.datasize + hdr.bsssize;
+        printf("total: %u (0x%04x)\n", sum);
 
-        puts("===aux===");
-        print2("header", sizeof(struct header));
-            print2("const", buf.consize);
-        if (buf.hasrel)
+        /*      puts("===aux===");
+             print2("header", sizeof(struct header));
+                 print2("const", hdr.consize);
+             if (hdr.hasrel)
+             {
+                 print2("rtext", hdr.textsize);
+                 print2("rdata", hdr.datasize);
+             } */
+
+        if (hdr.symsize)
         {
-            print2("rtext", buf.textsize);
-            print2("rdata", buf.datasize);
-        }
-        /* printf("entry: 0x%04x\n", buf.entry); */
-        if (buf.symsize)
-        {
-            symsize = buf.symsize * sizeof(struct sym);
+            symsize = hdr.symsize * sizeof(struct sym);
             printf("sym: %u (0x%04x)\t%u entries\n",
-                   symsize, symsize, buf.symsize);
+                   symsize, symsize, hdr.symsize);
+        }
+        else
+        {
+            symsize = 0;
         }
 
-        sum = buf.textsize +
-              buf.datasize +
+        sum = hdr.textsize +
+              hdr.datasize +
               symsize +
-              (buf.hasrel ? buf.textsize + buf.datasize : 0) +
+              (hdr.hasrel ? hdr.textsize + hdr.datasize : 0) +
               sizeof(struct header);
 
-        printf("\nfile size: %u (0x%04x)\n", sum, sum);
-
-/*         printf("\n===offsets==\n");
-
-        print2("text off", T_OFFSET(buf));
-        print2("data off", D_OFFSET(buf));
-        print2("rtext off", TREL_OFFSET(buf));
-        print2("rdata off", DREL_OFFSET(buf));
-        print2("sym off", SYM_OFFSET(buf)); */
+#if 0    
+        printf("hasrel: %d rel: %d\n", hdr.hasrel, (hdr.hasrel ? (hdr.textsize + hdr.datasize) : 0));
+        printf("hdr.symsize: %d symsize: %d\n", hdr.symsize, symsize);
+#endif
+        printf("file size: %u (0x%04x)\n", sum, sum);
 
         fseek(f, 0L, SEEK_END);
         i = ftell(f);

@@ -8,12 +8,12 @@
 #define DBG_TRACE 3
 
 #ifndef LOG
-#define LOG DBG_INFO
+#define LOG DBG_NONE
 #endif
 
 
 #if LOG >= DBG_INFO
-#define INFO printf
+#define INFO warnx
 #define INFOEN
 #else
 /* #define INFO nothing */
@@ -21,7 +21,7 @@
 #endif
 
 #if LOG >= DBG_DEBUG
-#define DBG printf
+#define DBG warnx
 #define DBGEN
 #else
 /* #define DBG nothing */
@@ -29,7 +29,7 @@
 #endif
 
 #if LOG >= DBG_TRACE
-#define TRACE printf
+#define TRACE warnx
 #define TRACEEN
 #else
 /* #define TRACE nothing */

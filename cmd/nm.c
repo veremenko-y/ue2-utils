@@ -84,10 +84,10 @@ main(argc, argv) char **argv;
             fprintf(stderr, "nm: cannot open %s\n", *argv);
             continue;
         }
-        fread((char *)&hdr, 1, sizeof(MAGIC), fi); /* get magic no. */
+        fread((char *)&hdr, 1, sizeof(MAGIC_OBJ), fi); /* get magic no. */
         if (hdr.magic == ARMAG)
             arch_flg++;
-        else if (hdr.magic != MAGIC)
+        else if (IS_MAGIC_VALID(hdr.magic) == 0)
         {
             fprintf(stderr, "nm: %s-- bad format\n", *argv);
             continue;
@@ -109,7 +109,7 @@ main(argc, argv) char **argv;
             struct sym sym;
 
             fread(&hdr, sizeof(struct header), 1, fi);
-            if (hdr.magic != MAGIC) /* archive element not in  */
+            if (IS_MAGIC_VALID(hdr.magic) == 0) /* archive element not in  */
                 continue;           /* proper format - skip it */
             o = hdr.textsize + hdr.datasize;
             if (hdr.hasrel)

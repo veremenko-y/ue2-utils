@@ -7,9 +7,8 @@ int16_t curtok;
 uint16_t segsize[4];
 int curseg;
 
-
 bswap(p)
-uint16_t *p;
+    uint16_t *p;
 {
     *p = (*p >> 8) | (*p << 8);
 }
@@ -18,7 +17,7 @@ static peek()
 {
     if (nexttok == -2)
     {
-        nexttok = getchar();
+        nexttok = getc(fin);
     }
     return nexttok;
 }
@@ -32,7 +31,7 @@ static advance()
     }
     else
     {
-        curtok = getchar();
+        curtok = getc(fin);
     }
 #if LOG >= 3
     if (curtok >= 32)
@@ -79,7 +78,7 @@ static readn(char *dst, int16_t n)
     }
     while (n-- > 0)
     {
-        *dst++ = getchar();
+        *dst++ = getc(fin);
     }
     TRACE("readn(x, %d) = %d\n", k, *dst);
 }
@@ -175,42 +174,19 @@ static parseins()
                 if (curtok == TOKSYM)
                 {
                     /*
-                    p = &syms[idx];
-                    cursym->segm = p->segm;
-                    strcpy(cursym->name, p->name);
-
-                    It's actually not relative, but absolute to a
-                    const table
-                    cursym->type |= SYMREL;
-
-                    I guess we should define it REL if it is defined in current object
-                    if ((p->type & SYMTYPE) != SYMUNDEF)
-                    {
-                        cursym->type |= SYMREL;
-                        cursym->value = p->value;
-                    }
-                    else
-                    {
-                        //cursym->value = idx - symstart + 1;
-                    }
-                    */
-                    /*
-                    After long bashing, I realized that I need to simply reference the symbol
-                    and instead add info to relocation indicating it's constant
-                    */
-                    /*
                     because linking sucks, I do need const symbol, just to have it exported and
                     resolved during the link process
                     */
                     p = &syms[idx];
                     sprintf(strbuf, "#%s", p->name);
                     symfind();
-                    if(cursym->name[0] == '\0') {
+                    if (cursym->name[0] == '\0')
+                    {
                         memcpy(cursym->name, strbuf, NAMESZ + 1);
                         cursym->segm = p->segm;
                         cursym->type = SYMCONST;
                         cursym->value = idx - symstart; /* const referenced value */
-                        if((p->type & SYMTYPE) != SYMUNDEF)
+                        if ((p->type & SYMTYPE) != SYMUNDEF)
                         {
                             p->type |= SYMCOEXPORT;
                             /* cursym->type |= SYMREL; */
@@ -259,7 +235,7 @@ static parseins()
                     if ((p->type & SYMTYPE))
                     {
                         /* if defined, just indicate segment */
-                        outrel(ins, (p->segm+1) << RELSEGSHIFT);
+                        outrel(ins, (p->segm + 1) << RELSEGSHIFT);
                     }
                     else
                     {
@@ -292,19 +268,23 @@ static parseset()
     {
         cursym->type = SYMABS;
         cursym->value = curtok;
+        cursym->segm = curseg;
     }
 }
 
-static parseexport()
+static parseglobl()
 {
-    expect(TOKSYM);
-    readn(&curtok, sizeof(curtok));
-    cursym = &syms[curtok];
-    if (passno == 1)
+    do
     {
-        cursym->segm = curseg;
-        cursym->type |= SYMEXPORT;
-    }
+        expect(TOKSYM);
+        readn(&curtok, sizeof(curtok));
+        cursym = &syms[curtok];
+        if (passno == 1)
+        {
+            cursym->segm = curseg;
+            cursym->type |= SYMEXPORT;
+        }
+    } while (peek() == ',' && advance());
     TRACE(".export %s = %d\n", cursym->name, curtok);
 }
 
@@ -359,63 +339,61 @@ parse()
         switch (curtok)
         {
         case '\n':
-            TRACE("TOK='\\n'\n");
+            TRACE("TOK='\\n'");
             break;
         case TOKSYM:
-            TRACE("TOKSYM\n");
+            TRACE("TOKSYM");
             readn(&curtok, sizeof(curtok));
             cursym = &syms[curtok];
             switch (cursym->type)
             {
             case STOKID:
-                TRACE("STOKID\n");
+                TRACE("STOKID");
                 expect(':');
                 if (passno == 0)
                 {
+                    /* INFO("STOKID %s %d %d %d\n", cursym->name, cursym->segm, cursym->type, cursym->value); */
                     if (cursym->type != SYMUNDEF)
                         error("redefined");
                     cursym->segm = curseg;
                     cursym->type = SYMREL;
                     cursym->value = segsize[curseg];
+                    /* INFO("STOKID %s %d %d %d\n", cursym->name, cursym->segm, cursym->type, cursym->value); */
                 }
                 break;
             case STOKTEXT:
-                TRACE("STOKTEXT\n");
+                TRACE("STOKTEXT");
                 curseg = SEGTEXT;
                 break;
             case STOKDATA:
-                TRACE("STOKDATA\n");
+                TRACE("STOKDATA");
                 curseg = SEGDATA;
                 break;
             case STOKBSS:
-                TRACE("STOKBSS\n");
+                TRACE("STOKBSS");
                 curseg = SEGBSS;
                 break;
             case STOKINS:
-                TRACE("STOKINS\n");
+                TRACE("STOKINS");
                 parseins();
                 break;
             case STOKSET:
-                TRACE("STOKSET\n");
+                TRACE("STOKSET");
                 parseset();
                 break;
-            case STOKEXPORT:
-                TRACE("STOKEXPORT\n");
-                parseexport();
-                break;
-            case STOKIMPORT:
-                TRACE("STOKIMPORT\n");
-                parseimport();
+            case STOKGLOBL:
+                TRACE("STOKGLOBL");
+                parseglobl();
                 break;
             case STOKRES:
-                TRACE("STOKRES\n");
+                TRACE("STOKRES");
                 parseres();
             case STOKBYTE:
-                TRACE("STOKBYTE\n");
+                TRACE("STOKBYTE");
                 advance();
                 if (curtok == TOKINT)
                 {
-                    TRACE("TOKINT\n");
+                    TRACE("TOKINT");
                     readn(&curtok, sizeof(curtok));
                     if (curtok > UINT8_MAX && curtok < INT8_MIN)
                         error("out of range");
@@ -424,7 +402,7 @@ parse()
                 }
                 else if (curtok == TOKSTR)
                 {
-                    TRACE("TOKSTR\n");
+                    TRACE("TOKSTR");
                     while ((curtok = advance()) != 0)
                     {
                         outb(curtok);

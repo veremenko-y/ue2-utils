@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <dbg.h>
 
 struct lsym
 {
@@ -46,6 +47,7 @@ uint16_t breloc;
 uint16_t consize;
 uint16_t consts[UINT8_MAX + 1];
 
+uint16_t torigin;
 uint16_t dorigin;
 uint16_t borigin;
 uint16_t corigin;
@@ -58,10 +60,16 @@ uint16_t bsize;
 FILE *fout;
 FILE *fout2;
 
+/* output params */
+char *outname = "a.out";
+uint8_t b_flag; /* binary output */
+uint8_t s_flag; /* strip output */
+uint8_t x_flag; /* only preserve external symbols */
+
 syminit()
 {
     symssize = 100;
-    syms = malloc(symssize * sizeof(struct lsym));
+    syms = calloc(symssize, sizeof(struct lsym));
 }
 
 symfind()
@@ -108,7 +116,7 @@ symprint(int i)
 {
     if (i >= symscnt)
     {
-        printf("NOT YET");
+        printf("NOT YET\n");
         return;
     }
 
@@ -192,7 +200,7 @@ load1(f)
     int read;
     char *name;
     fread(&hdr, sizeof(hdr), 1, f);
-    if (hdr.magic != MAGIC)
+    if (IS_RELOCATABLE(hdr.magic) == 0)
         error("invalid file");
 
     fseek(f, SYMOFFSET(hdr), SEEK_SET);
@@ -203,20 +211,24 @@ load1(f)
             (sym.type & SYMCOEXPORT) == 0)
         {
             rsymcnt++;
-            continue;
+            if (x_flag)
+            {
+                continue;
+            }
         }
         name = &sym.name;
         memcpy(strbuf, sym.name, NAMESZ + 1);
         symfind();
+        INFO("searched %s found %s N %d\n", strbuf, cursym->name, cursymn);
         if (!cursym->name[0])
         {
             symnew();
             *(struct sym *)cursym = sym;
             cursym->caddr = rsymcnt;
             symreloc();
-            printf("new %p ", cursym);
+            /* printf("new %p ", cursym);
             symprint(cursymn);
-            puts("");
+            puts(""); */
         }
         else
         {
@@ -248,7 +260,7 @@ load2(f)
     int read;
     struct lsym *consym;
     fread(&hdr, sizeof(hdr), 1, f);
-    if (hdr.magic != MAGIC)
+    if (IS_MAGIC_VALID(hdr.magic) == 0)
         error("invalid file");
 
     fseek(f, SYMOFFSET(hdr), SEEK_SET);
@@ -265,13 +277,17 @@ load2(f)
         {
             continue;
         }
+        /*
+        
+        FYI there's something messed up with #LABEL constants
+        
+        */
         consym = cursym;
         if (cursym->type & SYMABS)
         {
         }
         else
         {
-
             memcpy(strbuf, sym.name + 1, NAMESZ);
             symfind();
             if (!cursym->name[0] || (cursym->type & SYMTYPE) == SYMUNDEF)
@@ -280,7 +296,9 @@ load2(f)
             }
             else
             {
-                cursym->type &= ~(SYMCOEXPORT);
+                /* 
+                probably dont neeed (see below)
+                cursym->type &= ~(SYMCOEXPORT); */
             }
         }
         if (consts[cursym->value] == 0)
@@ -288,8 +306,10 @@ load2(f)
             consts[cursym->value] = ++consize;
         }
         consym->value = consts[cursym->value] + dreloc - 1;
+        /*
+        we want to keep constants exported
         consym->type &= ~(SYMABS | SYMEXPORT | SYMCOEXPORT);
-        consym->type |= SYMREL;
+        consym->type |= SYMREL; */
         consym->segm = SEGDATA;
     }
 }
@@ -301,7 +321,7 @@ FILE *frel;
 {
     FILE *out = fout;
     fread(&hdr, sizeof(hdr), 1, f);
-    if (hdr.magic != MAGIC)
+    if (IS_MAGIC_VALID(hdr.magic) == 0)
         error("invalid file");
     fseek(f, CODEOFFSET(hdr), SEEK_SET);
     fseek(frel, RELCODEOFFSET(hdr), SEEK_SET);
@@ -311,27 +331,28 @@ FILE *frel;
     int size = hdr.textsize + hdr.datasize;
     while (addr < size)
     {
-        if(addr == hdr.textsize) {
+        if (addr == hdr.textsize)
+        {
             out = fout2;
         }
         fread(&code, sizeof(code), 1, f);
         bswap(&code);
         fread(&rel, sizeof(rel), 1, frel);
-        printf("%04x: ", addr);
+        INFO("%04x: ", addr);
         if (rel & RELCONST)
         {
-            printf("CONST %04x\n", rel & ~(RELCONST));
+            INFO("CONST %04x\n", rel & ~(RELCONST));
             symidxfind((rel & ~(RELCONST)));
-            symprint(cursymn);
-            printf("\n%04x ==> ", code);
+            /* symprint(cursymn); */
+            INFO("\n%04x ==> ", code);
             code = (code & 0xf000) + cursym->value;
-            printf("%04x\n", code);
+            INFO("%04x\n", code);
         }
         else if (rel & RELSEG)
         {
             int seg = (((rel & RELSEG) >> (RELSEGSHIFT))) - 1;
-            printf("REG %d %d\n", seg, rel);
-            printf("%04x ==> ", code);
+            INFO("REG %d %d\n", seg, rel);
+            INFO("%04x ==> ", code);
             switch (seg)
             {
             case SEGTEXT:
@@ -346,22 +367,21 @@ FILE *frel;
             default:
                 error("invalid reloc");
             }
-            printf("%04x\n", code);
-            printf("%d\n", rel & ~(RELSEG));
+            INFO("%04x\n", code);
+            INFO("%d\n", rel & ~(RELSEG));
         }
         else if (rel != 0)
         {
-            rel--;
-            printf("REF %04x\n", rel);
-            symidxfind(rel);
-            symprint(cursymn);
-            printf("\n%04x ==> ", code);
+            INFO("REF %04x\n", rel-1);
+            symidxfind(rel-1);
+            /* symprint(cursymn); */
+            INFO("\n%04x ==> ", code);
             code = (code & 0xf000) + cursym->value;
-            printf("%04x\n", code);
+            INFO("%04x\n", code);
         }
         else
         {
-            printf("%04x\n", code);
+            INFO("%04x\n", code);
         }
         bswap(&code);
         fwrite(&code, sizeof(code), 1, out);
@@ -371,8 +391,6 @@ FILE *frel;
     dreloc += hdr.datasize;
     breloc += hdr.bsssize;
 }
-
-uint8_t b_flag;
 
 main(argc, argv) int argc;
 char **argv;
@@ -388,9 +406,30 @@ char **argv;
     {
         if (argv[args][0] == '-')
         {
-            if (argv[args][1] == 'b')
+            switch (argv[args][1])
             {
+            case 'b':
                 b_flag++;
+                break;
+            case 'x':
+                x_flag++;
+                break;
+            case 's':
+                s_flag++;
+                break;
+            case 'o':
+                if (++args < argc)
+                {
+                    outname = argv[args];
+                }
+                else
+                {
+                    error("no name");
+                }
+                break;
+            default:
+                error("invalid flag '%c'", argv[args][1]);
+                break;
             }
             args++;
         }
@@ -399,31 +438,29 @@ char **argv;
             break;
         }
     }
-    printf("%d\n", args);
     for (i = args; i < argc; i++)
     {
         fin = fopen(argv[i], "r");
-        puts(argv[i]);
         load1(fin);
         fclose(fin);
     }
+    torigin = 0; /* TODO: add load addr */
     dorigin = treloc; /* for constant region */
     corigin = dorigin + dreloc;
     for (i = args; i < argc; i++)
     {
         fin = fopen(argv[i], "r");
-        puts(argv[i]);
         load2(fin);
         fclose(fin);
     }
 
     borigin = corigin + consize;
-    printf("do %x co %x bo %x\n", dorigin, corigin, borigin);
+    INFO("data: %x consts: %x bss: %x\n", dorigin, corigin, borigin);
     for (i = 0; i < symscnt; i++)
     {
         p = &syms[i];
-        symprint(i);
-        putchar('\n');
+        /* symprint(i); */
+        /* putchar('\n'); */
         switch (p->segm)
         {
         case SEGDATA:
@@ -438,29 +475,34 @@ char **argv;
             error("duh %d %d", i, p->segm);
             break;
         }
-        symprint(i);
-        putchar('\n');
+       /*  symprint(i);
+        putchar('\n'); */
     }
 
-    symdump();
+    /* symdump(); */
 
-    printf("consts: %d\n", consize);
+    /*printf("consts: %d\n", consize);
     for (i = 0; i < 256; i++)
     {
         if (consts[i] != 0)
         {
             printf("[$%x]=$%x\n", i, (corigin + consts[i] - 1));
         }
-    }
+    }*/
 
-    fout = fopen("a.out", "w");
-    fout2 = fopen("a.outd", "w");
+    if (b_flag || s_flag)
+    {
+        symscnt = 0;
+    }
+    fout = fopen(outname, "w");
+    fout2 = tmpfile();
     tsize = treloc;
     dsize = dreloc;
     csize = consize;
     bsize = breloc;
     if (!b_flag)
     {
+        hdr.magic = MAGIC_EXE;
         hdr.hasrel = 0;
         hdr.textsize = tsize;
         hdr.datasize = dsize + consize;
@@ -474,19 +516,17 @@ char **argv;
     {
         fin = fopen(argv[i], "r");
         finr = fopen(argv[i], "r");
-        puts(argv[i]);
+        /* puts(argv[i]); */
         load3(fin, finr, fout, fout2);
         fclose(fin);
         fclose(finr);
     }
-    fclose(fout2);
-    fin = fopen("a.outd", "r");
-    while((i = getc(fin)) >= 0)
+    fseek(fout2, 0, SEEK_SET);
+    while ((i = getc(fout2)) >= 0)
     {
         putc(i, fout);
     }
-    fclose(fin);
-    unlink("a.outd");
+    fclose(fout2);
 
     for (i = 0; i < UINT8_MAX + 1; i++)
     {
@@ -495,7 +535,7 @@ char **argv;
             putc(i, fout);
         }
     }
-    if (!b_flag)
+    if (!b_flag && !s_flag)
     {
         for (i = 0; i < symscnt; i++)
         {

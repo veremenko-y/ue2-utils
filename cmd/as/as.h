@@ -24,8 +24,7 @@
 #define STOKBSS 6
 #define STOKSET 7
 #define STOKRES 8
-#define STOKEXPORT 9
-#define STOKIMPORT 10
+#define STOKGLOBL 9
 
 /* Memory access types */
 #define MNONE 0
@@ -40,6 +39,7 @@
 #define RELOFFS 2 /* segout offset for reloc files */
 
 /* as */
+extern FILE *fin;
 extern FILE *fout;
 extern FILE *segout[4];
 extern uint8_t passno;

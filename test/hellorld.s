@@ -1,5 +1,5 @@
-.import TX
-.import echo
+.globl TX
+.globl echo
 
 loop:
    ldl     hellorld
@@ -14,7 +14,7 @@ done:
     
     scf     Z
     bz     loop
-
+    ; ldl #done
 .data
 hellorld:
     .byte      "Hellorld"

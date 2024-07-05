@@ -75,8 +75,8 @@ main(argc, argv) char **argv;
             fprintf(stderr, "dis: cannot open %s\n", *argv);
             continue;
         }
-        fread(&hdr, sizeof(MAGIC), 1, fi); /* get magic no. */
-        if (hdr.magic != MAGIC)
+        fread(&hdr, sizeof(MAGIC_OBJ), 1, fi); /* get magic no. */
+        if (IS_MAGIC_VALID(hdr.magic) == 0)
         {
             fprintf(stderr, "dis: %s-- bad format\n", *argv);
             continue;
@@ -89,11 +89,11 @@ main(argc, argv) char **argv;
         struct sym sym;
 
         fread(&hdr, sizeof(struct header), 1, fi);
-        if (hdr.magic != MAGIC) /* archive element not in  */
+        if (IS_MAGIC_VALID(hdr.magic) == 0) /* archive element not in  */
             continue;           /* proper format - skip it */
 
         symscnt = n = hdr.symsize;
-        syms = malloc(sizeof(struct sym) * n);
+        syms = calloc(n, sizeof(struct sym));
         fseek(fi, SYMOFFSET(hdr), SEEK_SET);
         /* printf("read %d sym\n", n); */
         fread(syms, sizeof(struct sym), n, fi);

@@ -46,7 +46,12 @@ struct sym
 #define SEGBSS 2
 #define SEGCONST 3
 
-#define MAGIC ((uint16_t)0x4d47)
+#define MAGIC_OBJ ((uint16_t)0x4d47)
+#define MAGIC_RELOC ((uint16_t)0x4d48)
+#define MAGIC_EXE ((uint16_t)0x4d49)
+
+#define IS_MAGIC_VALID(x) (x == MAGIC_OBJ || x == MAGIC_RELOC || x == MAGIC_EXE)
+#define IS_RELOCATABLE(x) (x == MAGIC_OBJ || x == MAGIC_RELOC)
 
 struct header
 {
@@ -57,6 +62,7 @@ struct header
     uint16_t bsssize;
     uint8_t consize;
     uint16_t symsize;
+    uint16_t load;
 } PACKED;
 
 /* Offsets */

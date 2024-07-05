@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "as.h"
 
+/* char* outtmpl = "/tmp/outXXXXXXXX"; */
+FILE *fin;
 FILE *fout;
 FILE *segout[4];
 uint8_t passno;
@@ -15,7 +17,9 @@ va_list *args;
     fprintf(stderr, "line %d: ", lineno);
     fprintf(stderr, format, args);
     fprintf(stderr, "\n");
-    exit(2);
+    /* fcloseall(); not available on mingw gcc */
+    unlink(outname);
+    exit(EXIT_FAILURE);
 }
 
 main(argc, argv) char **argv;
@@ -23,7 +27,8 @@ main(argc, argv) char **argv;
     int i;
     if (argc > 1)
     {
-        freopen(argv[1], "r", stdin);
+        fin = fopen(argv[1], "r");
+        printf("%s:\n", argv[1]);
         argc--;
         i = 2;
         while (argc > 1)
@@ -44,51 +49,58 @@ main(argc, argv) char **argv;
             }
             i++;
         }
+    }else {
+        fin = stdin;
     }
 
     syminit();
-    fout = fopen("out.tokens", "w");
-    INFO("======== PASS 0 ========\n");
+    fout = tmpfile();
+    INFO("pass 0");
     scan();
-    fclose(fout);
     symdump();
 
-    freopen("out.tokens", "r", stdin);
-    INFO("======== PASS 1 ========\n");
+    fclose(fin);
+    fin = fout;
+    fout = NULL;
+    fseek(fin, 0, SEEK_SET);
+    /* fclose(stdin); */
+    /* dup2(fileno(fout), fileno(stdin));
+    fclose(fout);
+    fout = NULL; */
+
+
+    INFO("pass 1");
     parse();
     symdump();
 
-    INFO("======== PASS 2 ========\n");
+    INFO("pass 2");
     for (i = 0; i < sizeof(segsize) / sizeof(segsize[0]); i++)
     {
         segsize[i] = 0;
     }
-    fseek(stdin, 0, SEEK_SET);
+    fseek(fin, 0, SEEK_SET);
 
-    segout[0] = fopen("out.code", "w");
-    segout[1] = fopen("out.data", "w");
-    segout[2] = fopen("out.relcode", "w");
-    segout[3] = fopen("out.reldata", "w");
+    segout[0] = tmpfile();
+    segout[1] = tmpfile();
+    segout[2] = tmpfile();
+    segout[3] = tmpfile();
 
     passno = 1;
     parse();
-    fclose(stdin);
 
-    for (passno = 0; passno < sizeof(segout) / sizeof(segout[0]); passno++)
-    {
-        fclose(segout[passno]);
-    }
     symdump();
 
-    INFO("======== PASS 3 ========\n");
-    segout[0] = fopen("out.code", "r");
-    segout[1] = fopen("out.data", "r");
-    segout[2] = fopen("out.relcode", "r");
-    segout[3] = fopen("out.reldata", "r");
+    INFO("pass 3");
+    fseek(segout[0], 0, SEEK_SET);
+    fseek(segout[1], 0, SEEK_SET);
+    fseek(segout[2], 0, SEEK_SET);
+    fseek(segout[3], 0, SEEK_SET);
     assemble();
-    for (passno = 0; passno < sizeof(segout) / sizeof(segout[0]); passno++)
+
+/*     for (i = 0; i < sizeof(segout) / sizeof(segout[0]); i++)
     {
-        fclose(segout[passno]);
+        fclose(segout[i]);
+        segout[i] = NULL;
     }
-    return 0;
+ */    return 0;
 }

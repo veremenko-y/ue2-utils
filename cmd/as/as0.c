@@ -25,8 +25,7 @@ static struct sym ops[] = {
     {".bss", STOKBSS, 0, 0},
     {".set", STOKSET, 0, 0},
     {".res", STOKRES, 0, 0},
-    {".export", STOKEXPORT, 0, 0},
-    {".import", STOKIMPORT, 0, 0},
+    {".globl", STOKGLOBL, 0, 0},
 };
 
 struct sym *syms;
@@ -41,7 +40,7 @@ syminit()
 {
     symssize = 100;
     symscnt = symstart = sizeof(ops) / sizeof(ops[0]);
-    syms = malloc(symssize * sizeof(struct sym));
+    syms = calloc(symssize, sizeof(struct sym));
     memcpy(syms, ops, sizeof(ops));
 }
 
@@ -77,7 +76,7 @@ symdump()
 {
 #ifdef TRACEEN
     uint16_t i;
-    INFO("Symbols:\n");
+    INFO("Symbols:");
     for (i = 0; i < symscnt; i++)
     {
         INFO("%-10s[%x] ", syms[i].name, i);
@@ -138,7 +137,7 @@ static peek()
 {
     if (ch == -2)
     {
-        ch = getchar();
+        ch = getc(fin);
     }
     return ch;
 }
@@ -152,7 +151,7 @@ static advance()
         ch = -2;
         return c;
     }
-    return getchar();
+    return getc(fin);
 }
 
 is_alpha(c)
