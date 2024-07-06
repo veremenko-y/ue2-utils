@@ -153,7 +153,6 @@ static parseins()
                 {
                     symnew();
                     cursym->name[0] = '#';
-                    cursym->segm = SEGDATA;
                     cursym->type = SYMCONST | SYMEXPORT;
                     segsize[SEGCONST]++;
                 }
