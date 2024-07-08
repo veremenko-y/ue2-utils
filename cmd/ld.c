@@ -28,6 +28,8 @@ bswap(p)
     *p = (*p >> 8) | (*p << 8);
 }
 
+#define GETCONSTADDR(x) ((corigin + consts[x] - 1))
+
 /* symbols */
 struct lsym *syms;
 struct lsym *cursym;
@@ -167,7 +169,7 @@ symdump()
     printf("Symbols:\n");
     for (i = 0; i < symscnt; i++)
     {
-        printf("[%04x] ", syms[i].caddr);
+        printf("cadr[%04x] ", syms[i].caddr);
         symprint(i);
         puts("");
     }
@@ -210,9 +212,9 @@ load1(f)
             (sym.type & SYMEXPORT) == 0 &&
             (sym.type & SYMCOEXPORT) == 0)
         {
-            rsymcnt++;
             if (x_flag)
             {
+                rsymcnt++;
                 continue;
             }
         }
@@ -338,15 +340,19 @@ FILE *frel;
         fread(&code, sizeof(code), 1, f);
         bswap(&code);
         fread(&rel, sizeof(rel), 1, frel);
-        INFO("%04x: ", addr);
+        INFO("%04x: %04x rel %04x", addr, code, rel);
         if (rel & RELCONST)
         {
-            INFO("CONST %04x\n", rel & ~(RELCONST));
-            symidxfind((rel & ~(RELCONST)));
-            /* symprint(cursymn); */
-            INFO("\n%04x ==> ", code);
-            code = (code & 0xf000) + cursym->value;
-            INFO("%04x\n", code);
+            if((rel & ~(RELCONST)) == 0)
+            {
+                code = (code & 0xf000) | GETCONSTADDR(code & 0x0fff); /* Set const value from table */
+            }
+            else
+            {
+                symidxfind((rel & ~(RELCONST)));
+                code = (code & 0xf000) + cursym->value;
+            }
+            INFO("CONST %04x ==> %04x\n", rel & ~(RELCONST), code);
         }
         else if (rel & RELSEG)
         {
@@ -372,11 +378,11 @@ FILE *frel;
         }
         else if (rel != 0)
         {
-            INFO("REF %04x\n", rel-1);
             symidxfind(rel-1);
+            INFO("REF %d name %s\n", rel-1, cursym->name);
             /* symprint(cursymn); */
-            INFO("\n%04x ==> ", code);
-            code = (code & 0xf000) + cursym->value;
+            /* old code = (code & 0xf000) + cursym->value; */
+             code = code  + cursym->value; /* value + reloc offset */
             INFO("%04x\n", code);
         }
         else
@@ -444,6 +450,7 @@ char **argv;
         load1(fin);
         fclose(fin);
     }
+    INFO("pass 2");
     torigin = 0; /* TODO: add load addr */
     dorigin = treloc; /* for constant region */
     corigin = dorigin + dreloc;
@@ -479,21 +486,17 @@ char **argv;
         putchar('\n'); */
     }
 
-    /* symdump(); */
+    symdump();
 
-    /*printf("consts: %d\n", consize);
+    printf("consts: %d\n", consize);
     for (i = 0; i < 256; i++)
     {
         if (consts[i] != 0)
         {
-            printf("[$%x]=$%x\n", i, (corigin + consts[i] - 1));
+            printf("[$%x]=$%x\n", i, GETCONSTADDR(i));
         }
-    }*/
-
-    if (b_flag || s_flag)
-    {
-        symscnt = 0;
     }
+
     fout = fopen(outname, "w");
     fout2 = tmpfile();
     tsize = treloc;
@@ -509,9 +512,15 @@ char **argv;
         hdr.consize = csize;
         hdr.bsssize = bsize;
         hdr.symsize = symscnt;
+
+        if (b_flag || s_flag)
+        {
+            hdr.symsize = 0;
+        }
         fwrite(&hdr, sizeof(hdr), 1, fout);
     }
     treloc = dreloc = breloc = 0;
+    INFO("pass 3");
     for (i = args; i < argc; i++)
     {
         fin = fopen(argv[i], "r");

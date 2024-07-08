@@ -44,6 +44,24 @@ syminit()
     memcpy(syms, ops, sizeof(ops));
 }
 
+symfindp(struct sym *p)
+{
+    cursymn = 0;
+    cursym = syms;
+    while (cursymn < symscnt)
+    {
+        if (cursym->name[0] == 0)
+            break;
+        if (cursym == p)
+        {
+            return cursymn;
+        }
+        cursym++;
+        cursymn++;
+    }
+    
+}
+
 symfind()
 {
     cursymn = 0;

@@ -19,7 +19,7 @@ symprint(int i)
 {
     if (i >= symscnt)
     {
-        printf("NOT YET");
+        printf("%d nout found", i);
         return;
     }
 
@@ -95,7 +95,7 @@ main(argc, argv) char **argv;
         symscnt = n = hdr.symsize;
         syms = calloc(n, sizeof(struct sym));
         fseek(fi, SYMOFFSET(hdr), SEEK_SET);
-        /* printf("read %d sym\n", n); */
+        printf("read %d sym\n", n);
         fread(syms, sizeof(struct sym), n, fi);
         fseek(fi, CODEOFFSET(hdr), SEEK_SET);
         fseek(fir, RELCODEOFFSET(hdr), SEEK_SET);
@@ -112,7 +112,28 @@ main(argc, argv) char **argv;
             arg = ins & 0x0fff;
             fread(&rel, 1, 2, fir);
             /* rel = rel >> 8 | rel << 8; */
-            printf("; %04x: %04x %04x\n\t\t", (int)addr, (int)ins, rel);
+            printf("; %04x: %04x ", (int)addr, (int)ins);
+            if(rel & RELCONST)
+            {
+                printf("RELCONST ");
+            }
+            if(rel & RELSEG)
+            {
+                printf("RELSEG: ");
+                if((rel & RELSEG) == RELTEXT)
+                    printf("TEXT ");
+                if((rel & RELSEG) == RELDATA)
+                    printf("DATA ");
+                if((rel & RELSEG) == RELBSS)
+                    printf("BSS ");
+            }
+            printf("rel: %04x mask %04x value %04x\n", rel, (word_t)~(RELTYPE), (word_t)(rel & ~(RELTYPE)));
+            rel = rel & ~(RELTYPE);
+            if(rel != 0) {
+                printf("%d ", rel); 
+                symprint(rel-1);
+            }
+            printf("%04x\n\t\t");
             switch (ins >> 12)
             {
             case 0:

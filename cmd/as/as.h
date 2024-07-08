@@ -26,6 +26,8 @@
 #define STOKRES 8
 #define STOKGLOBL 9
 
+#define SYMID(x) (x - symstart)
+
 /* Memory access types */
 #define MNONE 0
 #define MABS 1
@@ -43,7 +45,7 @@
 #define EXPEXP 2 /* Expression */
 #define EXPNON 4 /* Expression */
 
-#define EXPRSIZE 6 /* Max expressions */
+#define EXPRSIZE 12 /* Max expressions */
 
 struct expr
 {

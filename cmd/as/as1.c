@@ -114,12 +114,13 @@ static outins(word_t ins, word_t arg)
     segsize[curseg] += sizeof(ins);
 }
 
-static outrel(word_t ins, word_t rel)
+static outrel(word_t ins, word_t arg, word_t rel)
 {
     if (curseg >= SEGBSS)
         error("bss out");
     if (passno == 1)
     {
+        ins = ins | arg;
         bswap(&ins);
         fwrite(&ins, sizeof(ins), 1, segout[curseg]);
         fwrite(&rel, sizeof(rel), 1, segout[curseg + RELOFFS]);
@@ -149,46 +150,80 @@ static printexpr(struct expr *e)
     {
         return;
     }
-    putchar('(');
+    if (e->op != 0 || e->r != NULL)
+        putchar('(');
     if (e->op)
     {
         putchar(e->op);
         putchar(' ');
     }
-    if(e->type == EXPINT)
+    if (e->type == EXPINT)
     {
         printf("%d", e->l.val);
     }
-    else if(e->type == EXPSYM)
+    else if (e->type == EXPSYM)
     {
         printf(e->l.sym->name);
     }
-    else if(e->type == EXPEXP)
+    else if (e->type == EXPEXP)
     {
         printexpr(e->l.expr);
     }
-    if(e->r != NULL){
+    if (e->r != NULL)
+    {
         putchar(' ');
         printexpr(e->r);
     }
-    putchar(')');
+    if (e->op != 0 || e->r != NULL)
+        putchar(')');
 }
 
-static dumpexpr()
+static dumpexpr(struct expr *e)
 {
-    struct expr *e = &expr[0];
     printexpr(e);
     putchar('\n');
 }
 
-static struct expr *getexpr()
+static resetexpr()
+{
+    int i;
+    for (i = 0; i < EXPRSIZE; i++)
+    {
+        expr[i].type = EXPNON;
+    }
+    exprcnt = 0;
+}
+
+static freeexpr(struct expr *e)
+{
+    int i;
+    e->type = EXPNON;
+    for (i = 0; i < EXPRSIZE; i++)
+    {
+        if (e == &expr[i])
+        {
+            exprcnt--;
+        }
+    }
+}
+
+static struct expr *allocexpr()
 {
     struct expr *e;
+    int i;
     if (exprcnt >= EXPRSIZE)
     {
         error("out of expr");
     }
-    e = &expr[exprcnt++];
+    for (i = 0; i < EXPRSIZE; i++)
+    {
+        if (expr[i].type == EXPNON)
+        {
+            e = &expr[i];
+            exprcnt++;
+            break;
+        }
+    }
     e->type = EXPNON;
     e->op = 0;
     e->r = NULL;
@@ -204,7 +239,7 @@ static exprprimary()
     word_t tok = advance();
     if (tok == TOKINT || tok == TOKSYM)
     {
-        e = getexpr();
+        e = allocexpr();
         readn(&val, sizeof(val));
         if (tok == TOKSYM)
         {
@@ -236,14 +271,100 @@ static exprunary()
     return l;
 }
 
+static combine(uint8_t op, struct expr *l, struct expr *r)
+{
+    struct expr *e;
+    switch (op)
+    {
+    case '+':
+    case '-':
+        if (l->type == EXPINT && r->type == EXPINT)
+        {
+            e = l;
+            e->l.val = op == '+'
+                           ? l->l.val + r->l.val
+                           : l->l.val - r->l.val;
+            freeexpr(r);
+        }
+        else
+        {
+            e = allocexpr();
+            e->type = EXPEXP;
+            e->op = op;
+            e->l.expr = l;
+            e->r = r;
+        }
+        return e;
+        break;
+    default:
+        error("reloc");
+        break;
+    }
+}
+
 static parsexpr()
 {
-    struct expr *e = exprunary();
+    struct expr *l = exprunary();
+    int op;
     while (peek() >= 0 && (nexttok == '+' || nexttok == '-'))
     {
-        e->r = exprunary();
+        op = advance();
+        l = combine(op, l, exprunary());
     }
-    return e;
+    return l;
+}
+
+static resolvevalue(struct expr *e)
+{
+    if (!e->op)
+    {
+        if (e->type == EXPSYM)
+        {
+            if (e->l.sym->type == SYMABS)
+            {
+                e->type = EXPINT;
+                e->l.val = e->l.sym->value;
+                return e;
+            }
+            else
+            {
+                return e;
+            }
+        }
+        else if (e->type == EXPINT)
+        {
+            return e;
+        }
+    }
+    error("reloc");
+}
+
+static resolveexpr(struct expr **out)
+{
+    struct expr *e;
+    struct expr *l;
+    struct expr *r;
+    resetexpr();
+    e = parsexpr();
+    if (passno == 0 || !e->op)
+    {
+        *out = e;
+        return 0;
+    }
+    l = resolvevalue(e->l.expr);
+    r = resolvevalue(e->r);
+    if (r->type == EXPSYM)
+    {
+        e = l;
+        l = r;
+        r = e;
+    }
+    if (r->type == EXPSYM)
+    {
+        error("reloc");
+    }
+    *out = l;
+    return r->l.val;
 }
 
 static parseins()
@@ -251,8 +372,10 @@ static parseins()
     word_t ins;
     char is_const = 0;
     word_t idx;
-    struct sym *p;
+    word_t arg = 0;
+    struct sym *p = NULL;
     word_t rel;
+    struct expr *e;
     /* segm in this case is representing instruction
      * addressing type */
     uint8_t mtype = cursym->segm;
@@ -264,79 +387,79 @@ static parseins()
     case MABS:
     case MIMM:
         ins = cursym->value;
-        /* advance(); */
-        exprcnt = 0;
-        struct expr *e = parsexpr();
-        dumpexpr();
-        if (curtok == '#')
+        if (peek() == '#')
         {
             advance();
             is_const = 1;
-            if (passno == 1)
-            {
-                if (curtok == TOKINT)
-                {
-                    symnew();
-                    cursym->name[0] = '#';
-                    cursym->type = SYMCONST | SYMEXPORT;
-                    segsize[SEGCONST]++;
-                }
-                else
-                {
-                    /* We only need it for size reporting */
-                    segsize[SEGCONST]++;
-                }
-            }
         }
-        if (curtok != TOKSYM && curtok != TOKINT)
-            err_unexp(curtok);
-        readn(&idx, sizeof(idx));
-        if (is_const)
+        idx = resolveexpr(&e);
+        /* struct expr *e = parsexpr(); */
+        if (passno == 0)
         {
-            if (passno == 1)
-            {
-                if (curtok == TOKSYM)
-                {
-                    /*
-                    because linking sucks, I do need const symbol, just to have it exported and
-                    resolved during the link process
-                    */
-                    p = &syms[idx];
-                    sprintf(strbuf, "#%s", p->name);
-                    symfind();
-                    if (cursym->name[0] == '\0')
-                    {
-                        memcpy(cursym->name, strbuf, NAMESZ + 1);
-                        cursym->segm = p->segm;
-                        cursym->type = SYMCONST;
-                        cursym->value = idx - symstart; /* const referenced value */
-                        if ((p->type & SYMTYPE) != SYMUNDEF)
-                        {
-                            p->type |= SYMCOEXPORT;
-                            /* cursym->type |= SYMREL; */
-                        }
-                    }
-                    rel = cursymn - symstart + 1; /* const symbol */
-                    rel |= RELCONST;
-                }
-                else
-                {
-                    cursym->type |= SYMABS;
-                    sprintf(cursym->name, "#%x", idx);
-                    cursym->value = idx;
-                    rel = cursymn - symstart + 1;
-                    /* rel |= RELCONST; */
-                }
-            }
-            outrel(ins, rel);
+            outins(ins, 0);
+            return;
+        }
+
+        printf("[%d]+", idx);
+        dumpexpr(e);
+
+        if (e->type == EXPINT)
+        {
+            idx = e->l.val;
         }
         else
         {
-            if (curtok == TOKSYM)
+            p = e->l.sym;
+        }
+
+        if (is_const)
+        {
+            if (p != NULL)
             {
-                p = &syms[idx];
-                if (passno == 1 &&
-                    p->segm == UINT8_MAX)
+                /*
+                because linking sucks, I do need const symbol, just to have it exported and
+                resolved during the link process
+                */
+                sprintf(strbuf, "#%s", p->name);
+                symfind();
+                if (cursym->name[0] == '\0')
+                {
+                    segsize[SEGCONST]++; /* We only need it for size reporting */
+                    memcpy(cursym->name, strbuf, NAMESZ + 1);
+                    cursym->segm = p->segm;
+                    cursym->type = SYMCONST;
+                    cursym->value = SYMID(idx); /* const referenced value */
+                    if ((p->type & SYMTYPE) != SYMUNDEF)
+                    {
+                        p->type |= SYMCOEXPORT;
+                        /* cursym->type |= SYMREL; */
+                    }
+                }
+                rel = SYMID(cursymn) + 1; /* const symbol */
+                rel |= RELCONST;
+            }
+            else
+            {
+                symnew();
+                cursym->name[0] = '#';
+                cursym->type = SYMCONST | SYMEXPORT;
+                segsize[SEGCONST]++;
+                cursym->type |= SYMABS;
+                sprintf(cursym->name, "#%x", idx);
+                cursym->value = idx;
+                /* rel = SYMID(cursymn) + 1; */ /* const symbol */
+                /* Because this is not undefined symbol, just mark as const and emmit value to be
+                looked up later */
+                arg = idx;
+                rel |= RELCONST;
+            }
+            outrel(ins, arg, rel);
+        }
+        else
+        {
+            if (p != NULL)
+            {
+                if (p->segm == UINT8_MAX)
                 {
                     if (mtype == MIMM)
                     {
@@ -350,7 +473,7 @@ static parseins()
                         p->segm = 0;
                     }
                 }
-                if ((p->type & ~(SYMEXPORT)) == SYMABS)
+                if ((p->type & SYMTYPE) == SYMABS)
                 {
                     outins(ins, p->value);
                 }
@@ -359,11 +482,11 @@ static parseins()
                     if ((p->type & SYMTYPE))
                     {
                         /* if defined, just indicate segment */
-                        outrel(ins, (p->segm + 1) << RELSEGSHIFT);
+                        outrel(ins, p->value + idx, (p->segm + 1) << RELSEGSHIFT);
                     }
                     else
                     {
-                        outrel(ins, idx - symstart + 1);
+                        outrel(ins, 0, SYMID(symfindp(p)) + 1);
                     }
                 }
             }

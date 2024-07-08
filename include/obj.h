@@ -11,6 +11,7 @@
 #define NAMESZ 8
 
 typedef uint16_t word_t;
+#define WORD_T_MASK (0x0fff)
 
 struct sym
 {
@@ -38,6 +39,7 @@ struct sym
 #define RELDATA (2 << RELSEGSHIFT)
 #define RELBSS (3 << RELSEGSHIFT)
 #define RELSEG (RELTEXT | RELDATA | RELBSS)
+#define RELTYPE (RELCONST | RELSEG)
 
 
 /* Segments */
