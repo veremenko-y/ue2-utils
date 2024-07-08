@@ -9,8 +9,8 @@ done:
     jsr echo
     lda     1
     ; expressions  not supported yet
-    adc     loop ;+1
-    stl     loop ;+1
+    adc     loop+1
+    stl     (loop+1)
     
     scf     Z
     bz     loop

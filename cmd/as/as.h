@@ -38,6 +38,26 @@
 
 #define RELOFFS 2 /* segout offset for reloc files */
 
+#define EXPINT 0 /* Integer */
+#define EXPSYM 1 /* Symbol */
+#define EXPEXP 2 /* Expression */
+#define EXPNON 4 /* Expression */
+
+#define EXPRSIZE 6 /* Max expressions */
+
+struct expr
+{
+    uint8_t type;
+    union {
+        struct expr *expr;
+        struct sym* sym;
+        word_t val;
+    } l;
+    uint8_t op;
+    struct expr *r;
+} PACKED;
+
+
 /* as */
 extern FILE *fin;
 extern FILE *fout;

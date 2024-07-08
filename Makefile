@@ -38,7 +38,7 @@ export LDFLAGS = $(ARCH)
 .PHONY: all clean test
 
 all:
-	mkdir bin
+	mkdir -p bin
 	make -C cmd -f build.mk
 	make -C cmd/as -f build.mk
 
@@ -46,7 +46,7 @@ clean:
 	rm -f bin/*
 
 test: all
-	mkdir tmp
+	mkdir -p tmp
 	./bin/ue2-as test/hellorld.s -o $(TMP_DIR)/hellorld.out
 	./bin/ue2-as test/def.s -o $(TMP_DIR)/def.out
 	./bin/ue2-ld -o $(TMP_DIR)/test1.out $(TMP_DIR)/hellorld.out $(TMP_DIR)/def.out

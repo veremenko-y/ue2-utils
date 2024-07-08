@@ -48,6 +48,22 @@ static advance()
     return curtok;
 }
 
+static err_unexp(tok)
+{
+    if (tok == TOKINT)
+    {
+        error("unexp int");
+    }
+    else if (tok == TOKSYM)
+    {
+        error("unexp symbol");
+    }
+    else
+    {
+        error("unexp '%c'", tok);
+    }
+}
+
 static expect(c) char c;
 {
     if (advance() != c)
@@ -124,15 +140,121 @@ static outb(word_t b)
     segsize[curseg]++;
 }
 
+struct expr expr[EXPRSIZE];
+int exprcnt;
+
+static printexpr(struct expr *e)
+{
+    if (e->type == EXPNON)
+    {
+        return;
+    }
+    putchar('(');
+    if (e->op)
+    {
+        putchar(e->op);
+        putchar(' ');
+    }
+    if(e->type == EXPINT)
+    {
+        printf("%d", e->l.val);
+    }
+    else if(e->type == EXPSYM)
+    {
+        printf(e->l.sym->name);
+    }
+    else if(e->type == EXPEXP)
+    {
+        printexpr(e->l.expr);
+    }
+    if(e->r != NULL){
+        putchar(' ');
+        printexpr(e->r);
+    }
+    putchar(')');
+}
+
+static dumpexpr()
+{
+    struct expr *e = &expr[0];
+    printexpr(e);
+    putchar('\n');
+}
+
+static struct expr *getexpr()
+{
+    struct expr *e;
+    if (exprcnt >= EXPRSIZE)
+    {
+        error("out of expr");
+    }
+    e = &expr[exprcnt++];
+    e->type = EXPNON;
+    e->op = 0;
+    e->r = NULL;
+    return e;
+}
+
+static parsexpr();
+
+static exprprimary()
+{
+    word_t val;
+    struct expr *e;
+    word_t tok = advance();
+    if (tok == TOKINT || tok == TOKSYM)
+    {
+        e = getexpr();
+        readn(&val, sizeof(val));
+        if (tok == TOKSYM)
+        {
+            e->l.sym = &syms[val];
+        }
+        else
+        {
+            e->l.val = val;
+        }
+        e->type = tok;
+    }
+    else if (tok == '(')
+    {
+        e = parsexpr();
+        expect(')');
+    }
+    else
+    {
+        err_unexp(tok);
+    }
+    return e;
+}
+
+static exprunary()
+{
+    struct expr *l;
+    struct expr *r;
+    l = exprprimary();
+    return l;
+}
+
+static parsexpr()
+{
+    struct expr *e = exprunary();
+    while (peek() >= 0 && (nexttok == '+' || nexttok == '-'))
+    {
+        e->r = exprunary();
+    }
+    return e;
+}
+
 static parseins()
 {
-    /* segm in this case is representing instruction
-     * addressing type */
     word_t ins;
     char is_const = 0;
     word_t idx;
     struct sym *p;
     word_t rel;
+    /* segm in this case is representing instruction
+     * addressing type */
     uint8_t mtype = cursym->segm;
     switch (mtype)
     {
@@ -142,7 +264,10 @@ static parseins()
     case MABS:
     case MIMM:
         ins = cursym->value;
-        advance();
+        /* advance(); */
+        exprcnt = 0;
+        struct expr *e = parsexpr();
+        dumpexpr();
         if (curtok == '#')
         {
             advance();
@@ -164,7 +289,7 @@ static parseins()
             }
         }
         if (curtok != TOKSYM && curtok != TOKINT)
-            error("unexp");
+            err_unexp(curtok);
         readn(&idx, sizeof(idx));
         if (is_const)
         {
@@ -304,7 +429,7 @@ static parseres()
     word_t idx;
     advance();
     if (curtok != TOKINT && curtok != TOKSYM)
-        error("unexp");
+        err_unexp(curtok);
     readn(&idx, sizeof(idx));
 
     if (curtok == TOKSYM)
@@ -412,9 +537,7 @@ parse()
             }
             break;
         default:
-
-            error("unexpected token %d", curtok);
-
+            err_unexp(curtok);
             break;
         }
     }
