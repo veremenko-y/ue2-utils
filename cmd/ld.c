@@ -68,6 +68,8 @@ uint8_t b_flag; /* binary output */
 uint8_t s_flag; /* strip output */
 uint8_t x_flag; /* only preserve external symbols */
 
+FILE *flbl; /* output labels */
+
 syminit()
 {
     symssize = 100;
@@ -114,15 +116,8 @@ symnew()
     }
 }
 
-symprint(int i)
+symprintp(struct sym *p, int i)
 {
-    if (i >= symscnt)
-    {
-        printf("NOT YET\n");
-        return;
-    }
-
-    struct sym *p = &syms[i];
     printf("%-8s[%04x]%8s", p->name, i, "");
     if (p->segm == SEGTEXT)
     {
@@ -163,6 +158,18 @@ symprint(int i)
     printf("= 0x%x", p->value);
 }
 
+symprint(int i)
+{
+    if (i >= symscnt)
+    {
+        printf("NOT YET\n");
+        return;
+    }
+
+    struct sym *p = &syms[i];
+    symprintp(p, i);
+}
+
 symdump()
 {
     uint16_t i;
@@ -174,6 +181,7 @@ symdump()
         puts("");
     }
 }
+#define symdump(...)
 
 symreloc()
 {
@@ -269,27 +277,27 @@ load2(f)
     while ((read = fread(&sym, sizeof(sym), 1, f)) > 0)
     {
         /* Find unresolved consts */
+        symprintp(&sym, 0);
+        puts("");
         if ((sym.type & (SYMCONST | SYMREL)) != SYMCONST)
         {
+            puts("skip1");
             continue;
         }
         memcpy(strbuf, sym.name, NAMESZ);
         symfind();
         if ((cursym->type & (SYMCONST | SYMREL)) != SYMCONST)
         {
+            puts("skip2");
             continue;
         }
-        /*
-        
-        FYI there's something messed up with #LABEL constants
-        
-        */
         consym = cursym;
         if (cursym->type & SYMABS)
         {
         }
         else
         {
+            printf("searching %s\n",sym.name + 1);
             memcpy(strbuf, sym.name + 1, NAMESZ);
             symfind();
             if (!cursym->name[0] || (cursym->type & SYMTYPE) == SYMUNDEF)
@@ -298,20 +306,34 @@ load2(f)
             }
             else
             {
-                /* 
+                /*
                 probably dont neeed (see below)
                 cursym->type &= ~(SYMCOEXPORT); */
             }
         }
-        if (consts[cursym->value] == 0)
+             printf("\nconsym\n");
+            symprintp(consym, 0);
+            puts("");
+        /* old if(consym->segm == UINT8_MAX) */
+        if((consym->type & (SYMCONST | SYMREL)) == SYMCONST) /* e.g. undefined const */
         {
-            consts[cursym->value] = ++consize;
+            printf("cursym\n");
+            symprintp(cursym, 0);
+       
+            if (consts[cursym->value] == 0)
+            {
+                consts[cursym->value] = ++consize;
+                consym->value = consts[cursym->value] + dreloc - 1;
+            }
+            printf("\nconsym after\n");
+            symprintp(consym, 0);
+            puts("");
         }
-        consym->value = consts[cursym->value] + dreloc - 1;
+        
         /*
         we want to keep constants exported
-        consym->type &= ~(SYMABS | SYMEXPORT | SYMCOEXPORT);
-        consym->type |= SYMREL; */
+        consym->type &= ~(SYMABS | SYMEXPORT | SYMCOEXPORT);*/
+        consym->type |= SYMREL; 
         consym->segm = SEGDATA;
     }
 }
@@ -343,7 +365,7 @@ FILE *frel;
         INFO("%04x: %04x rel %04x", addr, code, rel);
         if (rel & RELCONST)
         {
-            if((rel & ~(RELCONST)) == 0)
+            if ((rel & ~(RELCONST)) == 0)
             {
                 code = (code & 0xf000) | GETCONSTADDR(code & 0x0fff); /* Set const value from table */
             }
@@ -378,11 +400,11 @@ FILE *frel;
         }
         else if (rel != 0)
         {
-            symidxfind(rel-1);
-            INFO("REF %d name %s\n", rel-1, cursym->name);
+            symidxfind(rel - 1);
+            INFO("REF %d name %s\n", rel - 1, cursym->name);
             /* symprint(cursymn); */
             /* old code = (code & 0xf000) + cursym->value; */
-             code = code  + cursym->value; /* value + reloc offset */
+            code = code + cursym->value; /* value + reloc offset */
             INFO("%04x\n", code);
         }
         else
@@ -423,6 +445,11 @@ char **argv;
             case 's':
                 s_flag++;
                 break;
+            case 'L':
+                char tmp[256];
+                sprintf(tmp, "%s.labels", outname);
+                flbl = fopen(tmp, "w");
+                break;
             case 'o':
                 if (++args < argc)
                 {
@@ -451,7 +478,7 @@ char **argv;
         fclose(fin);
     }
     INFO("pass 2");
-    torigin = 0; /* TODO: add load addr */
+    torigin = 0;      /* TODO: add load addr */
     dorigin = treloc; /* for constant region */
     corigin = dorigin + dreloc;
     for (i = args; i < argc; i++)
@@ -482,18 +509,18 @@ char **argv;
             error("duh %d %d", i, p->segm);
             break;
         }
-       /*  symprint(i);
-        putchar('\n'); */
+        /*  symprint(i);
+         putchar('\n'); */
     }
 
     symdump();
 
-    printf("consts: %d\n", consize);
+    INFO("consts: %d", consize);
     for (i = 0; i < 256; i++)
     {
         if (consts[i] != 0)
         {
-            printf("[$%x]=$%x\n", i, GETCONSTADDR(i));
+            INFO("[$%x]=$%x\n", i, GETCONSTADDR(i));
         }
     }
 
@@ -544,12 +571,18 @@ char **argv;
             putc(i, fout);
         }
     }
-    if (!b_flag && !s_flag)
+
+    for (i = 0; i < symscnt; i++)
     {
-        for (i = 0; i < symscnt; i++)
+        if (!b_flag && !s_flag)
         {
             fwrite(&syms[i], sizeof(struct sym), 1, fout);
         }
+        if (flbl != NULL && (syms[i].type & ~(SYMCONST)) != SYMUNDEF)
+        {
+            fprintf(flbl, "%s=%04x\n", syms[i].name, syms[i].value);
+        }
     }
     fclose(fout);
+    fclose(flbl);
 }

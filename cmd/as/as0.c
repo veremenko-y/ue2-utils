@@ -2,22 +2,22 @@
 #include "as.h"
 
 static struct sym ops[] = {
-    {"bz", STOKINS, MIMM, 0 << 12},
-    {"bl", STOKINS, MIMM, 1 << 12},
-    {"lda", STOKINS, MABS, 2 << 12},
-    {"ldl", STOKINS, MIMM, 3 << 12},
-    {"stl", STOKINS, MIMM, 4 << 12},
-    {"jsr", STOKINS, MIMM, 5 << 12},
-    {"strh", STOKINS, MIMM, 6 << 12},
-    {"strl", STOKINS, MIMM, 7 << 12},
-    {"rsr", STOKINS, MNONE, 8 << 12},
-    {"scf", STOKINS, MABS, 9 << 12},
-    {"adc", STOKINS, MIMM, 10 << 12},
-    {"cmp", STOKINS, MIMM, 11 << 12},
-    {"ror", STOKINS, MIMM, 12 << 12},
-    {"nand", STOKINS, MIMM, 13 << 12},
-    {"ori", STOKINS, MIMM, 14 << 12},
-    {"ore", STOKINS, MIMM, 15 << 12},
+    {"bz", STOKINS, MIMM, 0},
+    {"bl", STOKINS, MIMM, 1},
+    {"lda", STOKINS, MABS, 2},
+    {"ldl", STOKINS, MIMM, 3},
+    {"stl", STOKINS, MIMM, 4},
+    {"jsr", STOKINS, MIMM, 5},
+    {"strh", STOKINS, MIMM, 6},
+    {"strl", STOKINS, MIMM, 7},
+    {"rsr", STOKINS, MNONE, 8},
+    {"scf", STOKINS, MABS, 9},
+    {"adc", STOKINS, MIMM, 10},
+    {"cmp", STOKINS, MIMM, 11},
+    {"ror", STOKINS, MIMM, 12},
+    {"nand", STOKINS, MIMM, 13},
+    {"ori", STOKINS, MIMM, 14},
+    {"ore", STOKINS, MIMM, 15},
     {".byte", STOKBYTE, 0, 0},
     {".word", STOKWORD, 0, 0},
     {".code", STOKTEXT, 0, 0},
@@ -59,7 +59,6 @@ symfindp(struct sym *p)
         cursym++;
         cursymn++;
     }
-    
 }
 
 symfind()
@@ -208,7 +207,13 @@ scan()
         case '\n':
             putc(c, fout);
             break;
-        case ';':
+        case '/':
+            if (peek() == '/')
+                goto comment;
+        case '#':
+            if (peek() != ' ')
+                goto notcomment;
+        comment:
             while (peek() != '\n' && ch != -1)
             {
                 advance();
@@ -224,6 +229,7 @@ scan()
             putc('\0', fout);
             break;
         default:
+        notcomment:
             if (is_alpha(c))
             {
                 p = strbuf;
@@ -240,6 +246,7 @@ scan()
                     cursym->type = STOKID;
                 }
                 putc(TOKSYM, fout);
+                putc(cursym->type, fout);
                 fwrite(&cursymn, sizeof(cursymn), 1, fout);
             }
             else if (is_digit(c))

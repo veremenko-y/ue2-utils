@@ -3,7 +3,7 @@ CFLAGS += -I$(PWD)/include
 
 .PHONY: all test
 
-PROGRAMS=nm size ld dis hdr
+PROGRAMS=nm size ld dis hdr ar
 
 all: $(PROGRAMS:%=$(BIN_DIR)/$(call out_name,%))
 

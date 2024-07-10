@@ -11,7 +11,6 @@
 #define NAMESZ 8
 
 typedef uint16_t word_t;
-#define WORD_T_MASK (0x0fff)
 
 struct sym
 {

@@ -6,6 +6,7 @@ int16_t curtok;
 
 uint16_t segsize[4];
 int curseg;
+int last_globlbl;
 
 bswap(p)
     uint16_t *p;
@@ -33,13 +34,30 @@ static advance()
     {
         curtok = getc(fin);
     }
-#if LOG >= 3
-    if (curtok >= 32)
-        TRACE("advance: %c dec='%d'\n", curtok, curtok);
+#if 0
+if(curtok >= 0)
+{
+    if (curtok > 1)
+    {
+        VINFO("%c", curtok);
+        if(curtok == ':') {
+            putchar(' ');
+        }
+    }
     else
     {
-        TRACE("advance: dec=%d\n", curtok);
+        word_t idx;
+        int tell = ftell(fin);
+        VINFO("[%d]", tell);
+        fread(&idx, sizeof(idx), 1, fin);
+        fseek(fin, -sizeof(idx), SEEK_CUR);
+        if(curtok == TOKINT) {
+            VINFO(" %04x", idx);
+        }else {
+            VINFO(" %s", syms[idx].name);
+        }
     }
+}
 #endif
     if (curtok == '\n')
     {
@@ -105,7 +123,7 @@ static outins(word_t ins, word_t arg)
         error("bss out");
     if (passno == 1)
     {
-        ins = ins | arg;
+        ins = (ins << 12) | arg;
         bswap(&ins);
         fwrite(&ins, sizeof(ins), 1, segout[curseg]);
         ins = 0;
@@ -120,7 +138,7 @@ static outrel(word_t ins, word_t arg, word_t rel)
         error("bss out");
     if (passno == 1)
     {
-        ins = ins | arg;
+        ins = (ins << 12) | arg;
         bswap(&ins);
         fwrite(&ins, sizeof(ins), 1, segout[curseg]);
         fwrite(&rel, sizeof(rel), 1, segout[curseg + RELOFFS]);
@@ -240,13 +258,15 @@ static exprprimary()
     if (tok == TOKINT || tok == TOKSYM)
     {
         e = allocexpr();
-        readn(&val, sizeof(val));
         if (tok == TOKSYM)
         {
+            getc(fin);
+            readn(&val, sizeof(val));
             e->l.sym = &syms[val];
         }
         else
         {
+            readn(&val, sizeof(val));
             e->l.val = val;
         }
         e->type = tok;
@@ -271,6 +291,13 @@ static exprunary()
     return l;
 }
 
+
+static join(uint8_t op, struct expr *l, struct expr *r)
+{
+    struct expr *e = allocexpr();
+
+}
+
 static combine(uint8_t op, struct expr *l, struct expr *r)
 {
     struct expr *e;
@@ -285,21 +312,21 @@ static combine(uint8_t op, struct expr *l, struct expr *r)
                            ? l->l.val + r->l.val
                            : l->l.val - r->l.val;
             freeexpr(r);
+            return e;
         }
-        else
-        {
-            e = allocexpr();
-            e->type = EXPEXP;
-            e->op = op;
-            e->l.expr = l;
-            e->r = r;
-        }
-        return e;
+        goto join;
         break;
     default:
         error("reloc");
         break;
     }
+join:
+    e = allocexpr();
+    e->type = EXPEXP;
+    e->op = op;
+    e->l.expr = l;
+    e->r = r;
+    return e;
 }
 
 static parsexpr()
@@ -393,15 +420,11 @@ static parseins()
             is_const = 1;
         }
         idx = resolveexpr(&e);
-        /* struct expr *e = parsexpr(); */
         if (passno == 0)
         {
             outins(ins, 0);
             return;
         }
-
-        printf("[%d]+", idx);
-        dumpexpr(e);
 
         if (e->type == EXPINT)
         {
@@ -414,6 +437,7 @@ static parseins()
 
         if (is_const)
         {
+            arg = idx;
             if (p != NULL)
             {
                 /*
@@ -450,7 +474,6 @@ static parseins()
                 /* rel = SYMID(cursymn) + 1; */ /* const symbol */
                 /* Because this is not undefined symbol, just mark as const and emmit value to be
                 looked up later */
-                arg = idx;
                 rel |= RELCONST;
             }
             outrel(ins, arg, rel);
@@ -486,12 +509,14 @@ static parseins()
                     }
                     else
                     {
-                        outrel(ins, 0, SYMID(symfindp(p)) + 1);
+                        /* if not, relocate undefined external */
+                        outrel(ins, idx, SYMID(symfindp(p)) + 1);
                     }
                 }
             }
             else
             {
+                /* Output absolute */
                 outins(ins, idx);
             }
         }
@@ -501,6 +526,7 @@ static parseins()
 static parseset()
 {
     expect(TOKSYM);
+    getc(fin);
     readn(&curtok, sizeof(curtok));
     cursym = &syms[curtok];
     expect(',');
@@ -524,6 +550,7 @@ static parseglobl()
     do
     {
         expect(TOKSYM);
+        getc(fin);
         readn(&curtok, sizeof(curtok));
         cursym = &syms[curtok];
         if (passno == 1)
@@ -538,6 +565,7 @@ static parseglobl()
 static parseimport()
 {
     expect(TOKSYM);
+    getc(fin);
     readn(&curtok, sizeof(curtok));
     if (passno == 1)
     {
@@ -581,6 +609,8 @@ parse()
 {
     lineno = 1;
     curseg = 0;
+    int symtype;
+    word_t idx;
     while (advance() >= 0)
     {
         switch (curtok)
@@ -588,25 +618,47 @@ parse()
         case '\n':
             TRACE("TOK='\\n'");
             break;
+        case ':': /* consume statement */
+            break;
         case TOKSYM:
             TRACE("TOKSYM");
-            readn(&curtok, sizeof(curtok));
-            cursym = &syms[curtok];
-            switch (cursym->type)
+            symtype = getc(fin);
+            readn(&idx, sizeof(idx));
+            cursym = &syms[idx];
+            /* printf("%s%c\n", cursym->name, peek()); */
+            switch (symtype)
             {
             case STOKID:
-                TRACE("STOKID");
+                INFO("STOKID");
                 expect(':');
+                if (cursym->name[0] != '.') /* not local label*/
+                {
+                    last_globlbl = idx;
+                }
                 if (passno == 0)
                 {
-                    /* INFO("STOKID %s %d %d %d\n", cursym->name, cursym->segm, cursym->type, cursym->value); */
                     if (cursym->type != SYMUNDEF)
-                        error("redefined");
-                    cursym->segm = curseg;
-                    cursym->type = SYMREL;
-                    cursym->value = segsize[curseg];
-                    /* INFO("STOKID %s %d %d %d\n", cursym->name, cursym->segm, cursym->type, cursym->value); */
+                    {
+                        /* 
+                        .local: / address 8
+                        label: // address 10
+                        .local: // address 12
+                        if last global has address greater than local
+                        it means we can redefine it
+                        */
+                        /* printf("last globl index %d\n", last_globlbl);
+                        printf("local was %d now %d last glob at %d!\n", cursym->value, segsize[curseg], syms[last_globlbl].value); */
+                        if ((syms[last_globlbl].segm == cursym->segm && syms[last_globlbl].value <= cursym->value)
+                            || cursym->name[0] != '.')
+                        {
+                            error("redefined");
+                        }
+                    }
                 }
+                /* printf("sym %s: %d\n", cursym->name, segsize[curseg]); */
+                cursym->segm = curseg;
+                cursym->type = SYMREL;
+                cursym->value = segsize[curseg];
                 break;
             case STOKTEXT:
                 TRACE("STOKTEXT");

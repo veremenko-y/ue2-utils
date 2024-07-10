@@ -14,10 +14,12 @@
 
 #if LOG >= DBG_INFO
 #define INFO warnx
+#define VINFO printf
 #define INFOEN
 #else
 /* #define INFO nothing */
 #define INFO(...)
+#define VINFO(...)
 #endif
 
 #if LOG >= DBG_DEBUG
@@ -30,10 +32,12 @@
 
 #if LOG >= DBG_TRACE
 #define TRACE warnx
+#define VTRACE printf
 #define TRACEEN
 #else
 /* #define TRACE nothing */
 #define TRACE(...)
+#define VTRACE(...)
 #endif
 
 

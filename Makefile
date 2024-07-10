@@ -41,6 +41,7 @@ all:
 	mkdir -p bin
 	make -C cmd -f build.mk
 	make -C cmd/as -f build.mk
+	make -C cmd/cpp -f build.mk
 
 clean:
 	rm -f bin/*
