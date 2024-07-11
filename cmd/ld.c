@@ -5,6 +5,67 @@
 #include <string.h>
 #include <dbg.h>
 
+/*
+Symbols format:
+symbol:
+    type:
+        UNDEF        = 0
+        ABSOLUTE     = 1 << 0
+        RELATIVE     = 1 << 1
+        CONST        = 1 << 2
+        # Additional flags
+        EXPORT       = 1 << 6
+        CONST EXPORT = 1 << 7
+
+
+Relocation format:
+
+text word
+    <ins:4>[<addr:12>|<value:12>]
+relocation
+    [<const:1><segment:3>]<value:12>
+    if rel = 0 => nothing to relocate
+
+
+Immediate value
+    text := <symbol.value>|<value>
+    rel := 0
+    symbol.segment := 0 - defined, doesn't matter
+
+Absolute const value
+    symbol["#<value>"] := <value> + <const-expression>
+    symbol.type = ABS
+    text := <value> + <const-expression>
+    rel := <const:1><value=0>
+
+Absolute symbol
+    text := <value>|<symbol.value>
+    rel := 0
+
+if not const
+Defined: -- local
+        text := <symbol.value + const-expression>
+        rel := <symbol.segment:3><value=0>
+Undefined: -- import
+        text := <symbol.value> + <const-expression>
+        rel := <symbol.index + 1>
+
+if const
+Defined: -- local
+        newsymbol["#<symbol.name>"] := <symbol.index>
+        newsymbol.type = CONST
+        text := <const-expression>
+        rel := <const:1><newsymbol.index +1>
+Undefined:
+        newsymbol["#<symbol.name>"] := <symbol.index>
+        newsymbol.type = CONST
+        symbol.type |= CONSTEXPORT
+        text := <const-expression>
+        rel := <const:1><newsymbol.index +1>
+
+
+*/
+
 struct lsym
 {
     uint8_t name[NAMESZ + 1];
@@ -277,18 +338,16 @@ load2(f)
     while ((read = fread(&sym, sizeof(sym), 1, f)) > 0)
     {
         /* Find unresolved consts */
-        symprintp(&sym, 0);
-        puts("");
+        /* symprintp(&sym, 0);
+        puts(""); */
         if ((sym.type & (SYMCONST | SYMREL)) != SYMCONST)
         {
-            puts("skip1");
             continue;
         }
         memcpy(strbuf, sym.name, NAMESZ);
         symfind();
         if ((cursym->type & (SYMCONST | SYMREL)) != SYMCONST)
         {
-            puts("skip2");
             continue;
         }
         consym = cursym;
@@ -297,7 +356,7 @@ load2(f)
         }
         else
         {
-            printf("searching %s\n",sym.name + 1);
+            printf("searching %s\n", sym.name + 1);
             memcpy(strbuf, sym.name + 1, NAMESZ);
             symfind();
             if (!cursym->name[0] || (cursym->type & SYMTYPE) == SYMUNDEF)
@@ -311,29 +370,19 @@ load2(f)
                 cursym->type &= ~(SYMCOEXPORT); */
             }
         }
-             printf("\nconsym\n");
-            symprintp(consym, 0);
-            puts("");
-        /* old if(consym->segm == UINT8_MAX) */
-        if((consym->type & (SYMCONST | SYMREL)) == SYMCONST) /* e.g. undefined const */
+        if ((consym->type & (SYMCONST | SYMREL)) == SYMCONST) /* e.g. undefined const */
         {
-            printf("cursym\n");
-            symprintp(cursym, 0);
-       
             if (consts[cursym->value] == 0)
             {
                 consts[cursym->value] = ++consize;
                 consym->value = consts[cursym->value] + dreloc - 1;
             }
-            printf("\nconsym after\n");
-            symprintp(consym, 0);
-            puts("");
         }
-        
+
         /*
         we want to keep constants exported
         consym->type &= ~(SYMABS | SYMEXPORT | SYMCOEXPORT);*/
-        consym->type |= SYMREL; 
+        consym->type |= SYMREL;
         consym->segm = SEGDATA;
     }
 }
@@ -353,15 +402,16 @@ FILE *frel;
     word_t rel;
     int addr = 0;
     int size = hdr.textsize + hdr.datasize;
+    int read;
     while (addr < size)
     {
         if (addr == hdr.textsize)
         {
             out = fout2;
         }
-        fread(&code, sizeof(code), 1, f);
+        read = fread(&code, 1, sizeof(code), f);
+        fread(&rel, 1, sizeof(rel), frel);
         bswap(&code);
-        fread(&rel, sizeof(rel), 1, frel);
         INFO("%04x: %04x rel %04x", addr, code, rel);
         if (rel & RELCONST)
         {
@@ -378,7 +428,7 @@ FILE *frel;
         }
         else if (rel & RELSEG)
         {
-            int seg = (((rel & RELSEG) >> (RELSEGSHIFT))) - 1;
+            int seg = ((rel & RELSEG) >> RELSEGSHIFT) -1;
             INFO("REG %d %d\n", seg, rel);
             INFO("%04x ==> ", code);
             switch (seg)
@@ -402,8 +452,6 @@ FILE *frel;
         {
             symidxfind(rel - 1);
             INFO("REF %d name %s\n", rel - 1, cursym->name);
-            /* symprint(cursymn); */
-            /* old code = (code & 0xf000) + cursym->value; */
             code = code + cursym->value; /* value + reloc offset */
             INFO("%04x\n", code);
         }
@@ -493,8 +541,6 @@ char **argv;
     for (i = 0; i < symscnt; i++)
     {
         p = &syms[i];
-        /* symprint(i); */
-        /* putchar('\n'); */
         switch (p->segm)
         {
         case SEGDATA:
@@ -509,8 +555,6 @@ char **argv;
             error("duh %d %d", i, p->segm);
             break;
         }
-        /*  symprint(i);
-         putchar('\n'); */
     }
 
     symdump();
@@ -552,7 +596,6 @@ char **argv;
     {
         fin = fopen(argv[i], "r");
         finr = fopen(argv[i], "r");
-        /* puts(argv[i]); */
         load3(fin, finr, fout, fout2);
         fclose(fin);
         fclose(finr);
@@ -584,5 +627,6 @@ char **argv;
         }
     }
     fclose(fout);
-    fclose(flbl);
+    if (flbl != NULL)
+        fclose(flbl);
 }

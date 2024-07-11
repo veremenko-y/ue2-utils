@@ -471,7 +471,6 @@ static parseins()
                 cursym->type |= SYMABS;
                 sprintf(cursym->name, "#%x", idx);
                 cursym->value = idx;
-                /* rel = SYMID(cursymn) + 1; */ /* const symbol */
                 /* Because this is not undefined symbol, just mark as const and emmit value to be
                 looked up later */
                 rel |= RELCONST;
@@ -625,7 +624,6 @@ parse()
             symtype = getc(fin);
             readn(&idx, sizeof(idx));
             cursym = &syms[idx];
-            /* printf("%s%c\n", cursym->name, peek()); */
             switch (symtype)
             {
             case STOKID:
@@ -646,8 +644,6 @@ parse()
                         if last global has address greater than local
                         it means we can redefine it
                         */
-                        /* printf("last globl index %d\n", last_globlbl);
-                        printf("local was %d now %d last glob at %d!\n", cursym->value, segsize[curseg], syms[last_globlbl].value); */
                         if ((syms[last_globlbl].segm == cursym->segm && syms[last_globlbl].value <= cursym->value)
                             || cursym->name[0] != '.')
                         {
@@ -655,11 +651,15 @@ parse()
                         }
                     }
                 }
-                /* printf("sym %s: %d\n", cursym->name, segsize[curseg]); */
                 cursym->segm = curseg;
                 cursym->type = SYMREL;
                 cursym->value = segsize[curseg];
                 break;
+            case STOKALIGN:
+                if(curseg < SEGBSS && segsize[curseg] & 1)
+                {
+                    outb(0);
+                }
             case STOKTEXT:
                 TRACE("STOKTEXT");
                 curseg = SEGTEXT;

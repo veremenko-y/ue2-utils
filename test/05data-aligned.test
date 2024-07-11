@@ -1,0 +1,6 @@
+.byte 0xD3  ; byte d3
+.align      ; byte 0
+; newfile align-noop
+.byte 0xEF  ; byte ef
+.byte 0x12  ; byte 12
+.align      // nothing

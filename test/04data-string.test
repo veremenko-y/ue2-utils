@@ -1,0 +1,9 @@
+.byte "Hellorld"
+; byte 48
+; byte 65
+; byte 6c
+; byte 6c
+; byte 6f
+; byte 72
+; byte 6c
+; byte 64 

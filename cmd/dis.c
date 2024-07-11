@@ -111,7 +111,6 @@ main(argc, argv) char **argv;
             ins = ins >> 8 | ins << 8;
             arg = ins & 0x0fff;
             fread(&rel, 1, 2, fir);
-            /* rel = rel >> 8 | rel << 8; */
             printf("; %04x: %04x ", (int)addr, (int)ins);
             if(rel & RELCONST)
             {
@@ -195,10 +194,9 @@ main(argc, argv) char **argv;
                 }
                 if (rel & RELSEG)
                 {
-                    int seg = (((rel & RELSEG) >> RELSEGSHIFT) - 1);
+                    int seg = ((rel & RELSEG) >> RELSEGSHIFT) -1;
                     for (i = 0; i < symscnt; i++)
                     {
-                        /* printf("%s %d %x\n", syms[i].name, syms[i].segm, syms[i].value); */
                         if (syms[i].segm == seg && syms[i].value == arg)
                         {
                             printf("XXX");

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "as.h"
 
-/* char* outtmpl = "/tmp/outXXXXXXXX"; */
 FILE *fin;
 FILE *fout;
 FILE *segout[4];
@@ -17,7 +16,6 @@ va_list *args;
     fprintf(stderr, "line %d: ", lineno);
     fprintf(stderr, format, args);
     fprintf(stderr, "\n");
-    /* fcloseall(); not available on mingw gcc */
     unlink(outname);
     exit(EXIT_FAILURE);
 }
@@ -28,7 +26,6 @@ main(argc, argv) char **argv;
     if (argc > 1)
     {
         fin = fopen(argv[1], "r");
-        printf("%s:\n", argv[1]);
         argc--;
         i = 2;
         while (argc > 1)
@@ -63,11 +60,6 @@ main(argc, argv) char **argv;
     fin = fout;
     fout = NULL;
     fseek(fin, 0, SEEK_SET);
-    /* fclose(stdin); */
-    /* dup2(fileno(fout), fileno(stdin));
-    fclose(fout);
-    fout = NULL; */
-
 
     INFO("pass 1");
     parse();

@@ -18,6 +18,7 @@ static struct sym ops[] = {
     {"nand", STOKINS, MIMM, 13},
     {"ori", STOKINS, MIMM, 14},
     {"ore", STOKINS, MIMM, 15},
+    {".align", STOKALIGN, 0, 0},
     {".byte", STOKBYTE, 0, 0},
     {".word", STOKWORD, 0, 0},
     {".code", STOKTEXT, 0, 0},
@@ -82,7 +83,8 @@ symnew()
 {
     cursymn = symscnt;
     cursym = &syms[symscnt++];
-    cursym->segm = UINT8_MAX;
+    cursym->segm = 0;
+    memset(cursym->name, 0, NAMESZ);
     if (symscnt >= symssize)
     {
         error("oo syms");

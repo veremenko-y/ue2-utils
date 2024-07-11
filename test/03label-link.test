@@ -1,0 +1,9 @@
+label1:
+bz label1 ; bz 0
+bz label2 ; bz 4
+label2:
+; newfile out2
+label3:
+bz label3 ; bz 4
+bz label4 ; bz 8
+label4:

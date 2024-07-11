@@ -12,6 +12,12 @@
 
 typedef uint16_t word_t;
 
+/* Segments */
+#define SEGTEXT 0
+#define SEGDATA 1
+#define SEGBSS 2
+#define SEGCONST 3
+
 struct sym
 {
     uint8_t name[NAMESZ + 1];
@@ -32,21 +38,15 @@ struct sym
 #define SYMCOEXPORT (1 << 6)
 
 /* Relocation types */
-#define RELCONST (1 << (7+8))
-#define RELSEGSHIFT (5+8)
-#define RELTEXT (1 << RELSEGSHIFT)
-#define RELDATA (2 << RELSEGSHIFT)
-#define RELBSS (3 << RELSEGSHIFT)
+#define RELCONST (1 << 15)
+#define RELSEGSHIFT (13)
+#define RELTEXT (SEGTEXT << RELSEGSHIFT)
+#define RELDATA (SEGDATA << RELSEGSHIFT)
+#define RELBSS (SEGBSS << RELSEGSHIFT)
 #define RELSEG (RELTEXT | RELDATA | RELBSS)
 #define RELTYPE (RELCONST | RELSEG)
 
-
-/* Segments */
-#define SEGTEXT 0
-#define SEGDATA 1
-#define SEGBSS 2
-#define SEGCONST 3
-
+/* Object file */
 #define MAGIC_OBJ ((uint16_t)0x4d47)
 #define MAGIC_RELOC ((uint16_t)0x4d48)
 #define MAGIC_EXE ((uint16_t)0x4d49)

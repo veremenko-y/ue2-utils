@@ -1,0 +1,16 @@
+bz 0    ;  bz 0
+bl 0    ;  bl 0
+lda 0   ;  lda 0
+ldl 0   ;  ldl 0
+stl 0   ;  stl 0
+jsr 0   ;  jsr 0
+strh 0  ;  strh 0
+strl 0  ;  strl 0
+rsr     ;  rsr 0
+scf 0   ;  scf 0
+adc 0   ;  adc 0
+cmp 0   ;  cmp 0
+ror 0   ;  ror 0
+nand 0  ;  nand 0
+ori 0   ;  ori 0
+ore 0   ;  ore 0

@@ -44,23 +44,12 @@ main(argc, argv) char **argv;
         }
         if (gorp > 2)
             printf("\n%s: \n", *argv);
-        /* puts("===segments==="); */
         printf("text: %u (0x%04x) data: %u (0x%04x) bss: %u (0x%04x) ",
                hdr.textsize, hdr.textsize,
                hdr.datasize, hdr.datasize,
                hdr.bsssize, hdr.bsssize);
         sum = hdr.textsize + hdr.datasize + hdr.bsssize;
         printf("total: %u (0x%04x)\n", sum);
-
-        /*      puts("===aux===");
-             print2("header", sizeof(struct header));
-                 print2("const", hdr.consize);
-             if (hdr.hasrel)
-             {
-                 print2("rtext", hdr.textsize);
-                 print2("rdata", hdr.datasize);
-             } */
-
         if (hdr.symsize)
         {
             symsize = hdr.symsize * sizeof(struct sym);

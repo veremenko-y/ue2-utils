@@ -17,14 +17,15 @@
 /* Symbol token types (stored in struct sym) */
 #define STOKID 0  /* label */
 #define STOKINS 1 /* instruction */
-#define STOKBYTE 2
-#define STOKWORD 3
-#define STOKTEXT 4
-#define STOKDATA 5
-#define STOKBSS 6
-#define STOKSET 7
-#define STOKRES 8
-#define STOKGLOBL 9
+#define STOKALIGN 2
+#define STOKBYTE 3
+#define STOKWORD 4
+#define STOKTEXT 5
+#define STOKDATA 6
+#define STOKBSS 7
+#define STOKSET 8
+#define STOKRES 9
+#define STOKGLOBL 10
 
 #define SYMID(x) (x - symstart)
 

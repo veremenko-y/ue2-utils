@@ -12,11 +12,19 @@ assemble()
     hdr.datasize = segsize[SEGDATA];
     hdr.bsssize = segsize[SEGBSS];
     hdr.consize = segsize[SEGCONST];
+    if (hdr.textsize & 1)
+    {
+        error("text misaligned");
+    }
+    if (hdr.datasize & 1)
+    {
+        error("data misaligned");
+    }
     hdr.symsize = symscnt - symstart;
     fwrite(&hdr, sizeof(hdr), 1, fout);
-    for(passno = 0; passno < sizeof(segout) / sizeof(segout[0]); passno++)
+    for (passno = 0; passno < sizeof(segout) / sizeof(segout[0]); passno++)
     {
-        while((c = getc(segout[passno])) >= 0)
+        while ((c = getc(segout[passno])) >= 0)
         {
             putc(c, fout);
         }

@@ -1,0 +1,8 @@
+lda 0      ; lda 0
+ldl #0     ; ldl 8
+ldl #64    ; ldl 9
+ldl #0xff  ; ldl a
+// data segment starts at 8
+; byte 0
+; byte 40
+; byte ff
