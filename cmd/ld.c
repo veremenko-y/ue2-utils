@@ -522,6 +522,9 @@ char **argv;
     for (i = args; i < argc; i++)
     {
         fin = fopen(argv[i], "r");
+        if(fin == NULL) {
+            error("can't open %s", argv[i]);
+        }
         load1(fin);
         fclose(fin);
     }

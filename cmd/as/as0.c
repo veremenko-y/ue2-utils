@@ -84,7 +84,7 @@ symnew()
     cursymn = symscnt;
     cursym = &syms[symscnt++];
     cursym->segm = 0;
-    memset(cursym->name, 0, NAMESZ);
+    memset(cursym->name, 0, NAMESZ + 1);
     if (symscnt >= symssize)
     {
         error("oo syms");
@@ -238,13 +238,20 @@ scan()
                 *p++ = c;
                 while (is_alpha_num(peek()))
                 {
-                    *p++ = advance();
+                    if (p < (strbuf + NAMESZ))
+                    {
+                        *p++ = advance();
+                    }
+                    else
+                    {
+                        advance();
+                    }
                 }
                 *p = '\0';
                 symfind();
                 if (cursym->name[0] == 0)
                 {
-                    memcpy(cursym->name, strbuf, sizeof(cursym->name));
+                    memcpy(cursym->name, strbuf, NAMESZ);
                     cursym->type = STOKID;
                 }
                 putc(TOKSYM, fout);

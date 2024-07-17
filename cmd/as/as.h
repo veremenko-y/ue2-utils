@@ -67,6 +67,7 @@ extern FILE *fout;
 extern FILE *segout[4];
 extern uint8_t passno;
 extern uint16_t lineno;
+extern uint16_t charno;
 extern char *outname;
 
 /* as0 */

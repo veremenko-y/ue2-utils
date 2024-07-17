@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include "as.h"
 
 int16_t nexttok = -2;
@@ -62,6 +63,11 @@ if(curtok >= 0)
     if (curtok == '\n')
     {
         lineno++;
+        charno = 1;
+    }
+    else
+    {
+        charno++;
     }
     return curtok;
 }
@@ -164,7 +170,7 @@ int exprcnt;
 
 static printexpr(struct expr *e)
 {
-    if (e->type == EXPNON)
+    if (e == NULL || e->type == EXPNON)
     {
         return;
     }
@@ -177,11 +183,11 @@ static printexpr(struct expr *e)
     }
     if (e->type == EXPINT)
     {
-        printf("%d", e->l.val);
+        printf("i:%d", e->l.val);
     }
     else if (e->type == EXPSYM)
     {
-        printf(e->l.sym->name);
+        printf("s:%s", e->l.sym->name);
     }
     else if (e->type == EXPEXP)
     {
@@ -283,24 +289,15 @@ static exprprimary()
     return e;
 }
 
-static exprunary()
-{
-    struct expr *l;
-    struct expr *r;
-    l = exprprimary();
-    return l;
-}
-
-
-static join(uint8_t op, struct expr *l, struct expr *r)
+/* static join(uint8_t op, struct expr *l, struct expr *r)
 {
     struct expr *e = allocexpr();
-
-}
+} */
 
 static combine(uint8_t op, struct expr *l, struct expr *r)
 {
     struct expr *e;
+    word_t val;
     switch (op)
     {
     case '+':
@@ -316,8 +313,39 @@ static combine(uint8_t op, struct expr *l, struct expr *r)
         }
         goto join;
         break;
+    case '<':
+    case '>':
+        if (l->type == EXPINT)
+        {
+            val = l->l.val;
+        }
+        else if (l->type == EXPSYM && l->l.sym->type == SYMABS)
+        {
+            val = l->l.sym->value;
+        }
+        else
+        {
+            /* Hoping linker can figure it out */
+            e = allocexpr();
+            e->op = op;
+            e->l.expr = l;
+            e->type = EXPEXP;
+            return e;
+        }
+        if (op == '<')
+        {
+            val &= 0xff;
+        }
+        else
+        {
+            val >>= 8;
+        }
+        l->l.val = val;
+        l->type = EXPINT;
+        l->op = 0;
+        return l;
     default:
-        error("reloc");
+        error("reloc3");
         break;
     }
 join:
@@ -327,6 +355,26 @@ join:
     e->l.expr = l;
     e->r = r;
     return e;
+}
+
+static exprunary()
+{
+    struct expr *l;
+    int tok = peek();
+    if (tok == '<' || tok == '>')
+    {
+        advance();
+    }
+    else
+    {
+        tok = 0;
+    }
+    l = exprprimary();
+    if (tok)
+    {
+        l = combine(tok, l, (struct expr *)NULL);
+    }
+    return l;
 }
 
 static parsexpr()
@@ -343,6 +391,10 @@ static parsexpr()
 
 static resolvevalue(struct expr *e)
 {
+    if (e == NULL)
+    {
+        return NULL;
+    }
     if (!e->op)
     {
         if (e->type == EXPSYM)
@@ -363,7 +415,12 @@ static resolvevalue(struct expr *e)
             return e;
         }
     }
-    error("reloc");
+    else if (e->op == '<' || e->op == '>')
+    {
+        printexpr(e);
+        error("why");
+    }
+    error("reloc1");
 }
 
 static resolveexpr(struct expr **out)
@@ -373,25 +430,55 @@ static resolveexpr(struct expr **out)
     struct expr *r;
     resetexpr();
     e = parsexpr();
-    if (passno == 0 || !e->op)
+    /*  if(passno != 0) {
+      printexpr(e);
+     if(e != NULL)
+     printexpr(e->r);
+     puts("resolve");
+     } */
+    if (passno == 0)
     {
         *out = e;
         return 0;
     }
-    l = resolvevalue(e->l.expr);
-    r = resolvevalue(e->r);
-    if (r->type == EXPSYM)
+
+    if (!e->op)
     {
-        e = l;
-        l = r;
-        r = e;
+        l = resolvevalue(e);
+        if (l->type == EXPINT)
+        {
+            *out = NULL;
+            return l->l.val;
+        }
+        else if (l->type == EXPSYM)
+        {
+            *out = l;
+            return 0;
+        }
+        else
+        {
+            printexpr(e);
+            error("reloc4");
+        }
     }
-    if (r->type == EXPSYM)
+    else
     {
-        error("reloc");
+        l = resolvevalue(e->l.expr);
+        r = resolvevalue(e->r);
+        if (r && r->type == EXPSYM)
+        {
+            e = l;
+            l = r;
+            r = e;
+        }
+        if (r)
+        {
+            if (r->type == EXPSYM)
+                error("reloc2");
+        }
+        *out = l;
+        return r ? r->l.val : 0;
     }
-    *out = l;
-    return r->l.val;
 }
 
 static parseins()
@@ -426,15 +513,23 @@ static parseins()
             return;
         }
 
-        if (e->type == EXPINT)
+        if (e)
         {
-            idx = e->l.val;
+            if (e->type == EXPINT)
+            {
+                idx = e->l.val;
+            }
+            else if (e->type == EXPSYM)
+            {
+                p = e->l.sym;
+            }
+            else if (e->type == EXPEXP)
+            {
+                if (e->op == '<' || e->op == '>')
+                {
+                }
+            }
         }
-        else
-        {
-            p = e->l.sym;
-        }
-
         if (is_const)
         {
             arg = idx;
@@ -524,17 +619,25 @@ static parseins()
 
 static parseset()
 {
+    word_t idx;
+    struct expr *e;
+
     expect(TOKSYM);
     getc(fin);
     readn(&curtok, sizeof(curtok));
     cursym = &syms[curtok];
     expect(',');
-    expect(TOKINT);
     if (passno == 0 && cursym->type != SYMUNDEF)
     {
         error("redefined");
     }
-    readn(&curtok, sizeof(curtok));
+    idx = resolveexpr(&e);
+
+    printf(".set %s %d\n", cursym->name, idx);
+    printexpr(e);
+    putchar('\n');
+
+    /*  readn(&curtok, sizeof(curtok)); */
     TRACE(".set %s = %d\n", cursym->name, curtok);
     if (passno == 0)
     {
@@ -607,6 +710,7 @@ static parseres()
 parse()
 {
     lineno = 1;
+    charno = 1;
     curseg = 0;
     int symtype;
     word_t idx;
@@ -637,15 +741,14 @@ parse()
                 {
                     if (cursym->type != SYMUNDEF)
                     {
-                        /* 
+                        /*
                         .local: / address 8
                         label: // address 10
                         .local: // address 12
                         if last global has address greater than local
                         it means we can redefine it
                         */
-                        if ((syms[last_globlbl].segm == cursym->segm && syms[last_globlbl].value <= cursym->value)
-                            || cursym->name[0] != '.')
+                        if ((syms[last_globlbl].segm == cursym->segm && syms[last_globlbl].value <= cursym->value) || cursym->name[0] != '.')
                         {
                             error("redefined");
                         }
@@ -656,7 +759,7 @@ parse()
                 cursym->value = segsize[curseg];
                 break;
             case STOKALIGN:
-                if(curseg < SEGBSS && segsize[curseg] & 1)
+                if (curseg < SEGBSS && segsize[curseg] & 1)
                 {
                     outb(0);
                 }

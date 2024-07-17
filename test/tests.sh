@@ -2,8 +2,16 @@
 
 PATH="../bin:$PATH"
 
+declare -i org
+detailed=false
+
 function byte() {
+    org+=1
     echo -e -n "\x$1" >> expect.bin
+}
+
+function offset() {
+    printf "%x" $((org + $1))
 }
 
 function bz() {
@@ -84,7 +92,7 @@ function src() {
         IFS=';'; t=($line); unset IFS
         echo ${t[0]} >> $1.s
         if [ "$line" != "" ] && [ ${#t[@]} -eq 2 ]; then
-            ${t[1]}
+            eval ${t[1]}
         fi
     done 
     if ! ue2-as $1.s -o $1.o; then
@@ -100,20 +108,20 @@ function expect() {
     /usr/bin/cmp -s expect.bin built.bin
     status=$?
     if [[ $status = 0 ]]; then
-        printf "${GREEN}[PASS]${NC}\n"
+        echo -e "${GREEN}[PASS]${NC}"
     else
-        printf "${RED}[FAIL]${NC}\n"
-        if [ -f "expect.bin" ] && [ -f "built.bin" ]; then
-            /usr/bin/cmp expect.bin built.bin
-            #bindiff expect.bin built.bin
+        echo -e "${RED}[FAIL]${NC}"
+        if $detailed ; then
+            if [ -f "expect.bin" ] && [ -f "built.bin" ]; then
+                /usr/bin/cmp expect.bin built.bin
+                #bindiff expect.bin built.bin
+            fi
+            [[ -f expect.bin ]] && echo "expect.bin:" && hexdump -C expect.bin
+            [[ -f built.bin ]] && echo "built.bin:" && hexdump -C built.bin
+            [[ -f *.o ]] && ue2-nm *.o
+            #ue2-dis expect.bin built.bin
+            exit 1
         fi
-        echo "expect.bin:"
-        hexdump -C expect.bin
-        echo "built.bin:"
-        hexdump -C built.bin
-        ue2-nm *.o
-        #ue2-dis expect.bin built.bin
-        exit 1
     fi
 }
 
@@ -134,6 +142,7 @@ function cleanup() {
 
 function runtest() {
     cleanup
+    org=0
     f=$1
     name="${f%.*}"
     src $name < $f
@@ -142,11 +151,16 @@ function runtest() {
     expect
 }
 
+if [ "$1" == "--detailed" ]; then
+    detailed=true
+    shift
+fi
 if [ "$1" == "" ]; then
     for f in *.test; do
     runtest $f
+    cleanup
     done
 else
     runtest $1
+    cleanup
 fi
-cleanup

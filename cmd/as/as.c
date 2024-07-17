@@ -6,6 +6,7 @@ FILE *fout;
 FILE *segout[4];
 uint8_t passno;
 uint16_t lineno;
+uint16_t charno;
 char* outname = "a.out";
 
 nothing() {}
@@ -13,7 +14,7 @@ nothing() {}
 error(format, args) char *format;
 va_list *args;
 {
-    fprintf(stderr, "line %d: ", lineno);
+    fprintf(stderr, "pass %d line %d at %d: ", passno, lineno, charno);
     fprintf(stderr, format, args);
     fprintf(stderr, "\n");
     unlink(outname);
