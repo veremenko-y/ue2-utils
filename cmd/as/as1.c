@@ -5,15 +5,21 @@
 int16_t nexttok = -2;
 int16_t curtok;
 
-uint16_t segsize[4];
+uint16_t segsize[6];
 int curseg;
 int last_globlbl;
 
-bswap(p)
-    uint16_t *p;
+bswap16(p)
+    addr_t *p;
 {
     *p = (*p >> 8) | (*p << 8);
 }
+
+bswap32(uint8_t *s)
+{
+    *s = (uint32_t)(s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3]);
+}
+
 
 static peek()
 {
@@ -47,7 +53,7 @@ if(curtok >= 0)
     }
     else
     {
-        word_t idx;
+        addr_t idx;
         int tell = ftell(fin);
         VINFO("[%d]", tell);
         fread(&idx, sizeof(idx), 1, fin);
@@ -123,36 +129,63 @@ static readn(char *dst, int16_t n)
     TRACE("readn(x, %d) = %d\n", k, *dst);
 }
 
-static outins(word_t ins, word_t arg)
+static outins(addr_t ins, addr_t arg)
 {
     if (curseg >= SEGBSS)
         error("bss out");
     if (passno == 1)
     {
-        ins = (ins << 12) | arg;
-        bswap(&ins);
-        fwrite(&ins, sizeof(ins), 1, segout[curseg]);
+        int i;
+        char c;
+        irword_t ir = (ins << IRSHIFT) | arg;
+        /* bswap32(&ir); */
+        /* printf("outins: "); */
+        for(i = 0; i < IRSIZE; i++)
+        {
+            c = ((char*)&ir)[IRSIZE - i - IROFFSET];
+            /* printf("%02x ", (int)(c & 0xff)); */
+            putc(c, segout[curseg]);
+        }
+    /*     putchar('\n'); */
+        /* fwrite(&ins, sizeof(ins), 1, segout[curseg]);
         ins = 0;
-        fwrite(&ins, sizeof(ins), 1, segout[curseg + RELOFFS]);
+        fwrite(&ins, sizeof(ins), 1, segout[curseg + RELOFFS]); */
     }
-    segsize[curseg] += sizeof(ins);
+    segsize[curseg] += IRSIZE;
+    putc(0, segout[curseg + RELOFFS]);
+    segsize[curseg + SIZERELOFF] += 1;
 }
 
-static outrel(word_t ins, word_t arg, word_t rel)
+static outrel(addr_t ins, addr_t arg, irword_t rel)
 {
     if (curseg >= SEGBSS)
         error("bss out");
     if (passno == 1)
     {
-        ins = (ins << 12) | arg;
-        bswap(&ins);
+ int i;
+        char c;
+        irword_t ir = (ins << IRSHIFT) | arg;
+/*         bswap32(&ir);
+        bswap32(&rel); */
+
+        for(i = 0; i < IRSIZE; i++)
+        {
+            c = ((char*)&ir)[IRSIZE - i - IROFFSET];
+            /* printf("%02x ", (int)(c & 0xff); */
+            putc(c, segout[curseg]);
+            c = ((char*)&rel)[IRSIZE - i - IROFFSET];
+            putc(c, segout[curseg + RELOFFS]);
+        }
+/*         ins = (ins << 12) | arg;
+        bswap16(&ins);
         fwrite(&ins, sizeof(ins), 1, segout[curseg]);
-        fwrite(&rel, sizeof(rel), 1, segout[curseg + RELOFFS]);
+        fwrite(&rel, sizeof(rel), 1, segout[curseg + RELOFFS]); */
     }
-    segsize[curseg] += sizeof(ins);
+    segsize[curseg] += IRSIZE;
+    segsize[curseg+SIZERELOFF] += IRSIZE;
 }
 
-static outb(word_t b)
+static outb(uint8_t b)
 {
     if (curseg >= SEGBSS)
         error("bss out");
@@ -163,6 +196,7 @@ static outb(word_t b)
         putc(b, segout[curseg + RELOFFS]);
     }
     segsize[curseg]++;
+    segsize[curseg+SIZERELOFF]++;
 }
 
 struct expr expr[EXPRSIZE];
@@ -174,8 +208,7 @@ static printexpr(struct expr *e)
     {
         return;
     }
-    if (e->op != 0 || e->r != NULL)
-        putchar('(');
+    putchar('(');
     if (e->op)
     {
         putchar(e->op);
@@ -198,8 +231,7 @@ static printexpr(struct expr *e)
         putchar(' ');
         printexpr(e->r);
     }
-    if (e->op != 0 || e->r != NULL)
-        putchar(')');
+    putchar(')');
 }
 
 static dumpexpr(struct expr *e)
@@ -258,9 +290,9 @@ static parsexpr();
 
 static exprprimary()
 {
-    word_t val;
+    addr_t val;
     struct expr *e;
-    word_t tok = advance();
+    addr_t tok = advance();
     if (tok == TOKINT || tok == TOKSYM)
     {
         e = allocexpr();
@@ -294,14 +326,17 @@ static exprprimary()
     struct expr *e = allocexpr();
 } */
 
+static resolvevalue(struct expr *e);
+
 static combine(uint8_t op, struct expr *l, struct expr *r)
 {
     struct expr *e;
-    word_t val;
+    addr_t val;
     switch (op)
     {
     case '+':
     case '-':
+        l = resolvevalue(l);
         if (l->type == EXPINT && r->type == EXPINT)
         {
             e = l;
@@ -430,18 +465,9 @@ static resolveexpr(struct expr **out)
     struct expr *r;
     resetexpr();
     e = parsexpr();
-    /*  if(passno != 0) {
-      printexpr(e);
-     if(e != NULL)
-     printexpr(e->r);
-     puts("resolve");
-     } */
-    if (passno == 0)
-    {
-        *out = e;
-        return 0;
-    }
-
+    /* printexpr(e);
+    puts(""); */
+    /* Some expressions, like .set MUST resolve in pass 0 */
     if (!e->op)
     {
         l = resolvevalue(e);
@@ -483,12 +509,12 @@ static resolveexpr(struct expr **out)
 
 static parseins()
 {
-    word_t ins;
+    addr_t ins;
     char is_const = 0;
-    word_t idx;
-    word_t arg = 0;
+    addr_t idx;
+    addr_t arg = 0;
     struct sym *p = NULL;
-    word_t rel;
+    irword_t rel;
     struct expr *e;
     /* segm in this case is representing instruction
      * addressing type */
@@ -619,7 +645,7 @@ static parseins()
 
 static parseset()
 {
-    word_t idx;
+    addr_t idx;
     struct expr *e;
 
     expect(TOKSYM);
@@ -632,17 +658,16 @@ static parseset()
         error("redefined");
     }
     idx = resolveexpr(&e);
-
-    printf(".set %s %d\n", cursym->name, idx);
-    printexpr(e);
-    putchar('\n');
-
-    /*  readn(&curtok, sizeof(curtok)); */
-    TRACE(".set %s = %d\n", cursym->name, curtok);
+    if (e != NULL)
+    {
+        printexpr(e);
+        error("must be const");
+    }
+    TRACE(".set %s = %d\n", cursym->name, idx);
     if (passno == 0)
     {
         cursym->type = SYMABS;
-        cursym->value = curtok;
+        cursym->value = idx;
         cursym->segm = curseg;
     }
 }
@@ -679,7 +704,7 @@ static parseimport()
 
 static parseres()
 {
-    word_t idx;
+    addr_t idx;
     advance();
     if (curtok != TOKINT && curtok != TOKSYM)
         err_unexp(curtok);
@@ -713,7 +738,8 @@ parse()
     charno = 1;
     curseg = 0;
     int symtype;
-    word_t idx;
+    addr_t idx;
+    struct expr *e;
     while (advance() >= 0)
     {
         switch (curtok)
@@ -790,25 +816,30 @@ parse()
             case STOKRES:
                 TRACE("STOKRES");
                 parseres();
+                break;
             case STOKBYTE:
                 TRACE("STOKBYTE");
-                advance();
-                if (curtok == TOKINT)
+                if (peek() == TOKSTR)
                 {
-                    TRACE("TOKINT");
-                    readn(&curtok, sizeof(curtok));
-                    if (curtok > UINT8_MAX && curtok < INT8_MIN)
-                        error("out of range");
-                    outb(curtok);
-                    break;
-                }
-                else if (curtok == TOKSTR)
-                {
+                    advance();
                     TRACE("TOKSTR");
                     while ((curtok = advance()) != 0)
                     {
                         outb(curtok);
                     }
+                    break;
+                }
+                else
+                {
+                    TRACE("TOKINT");
+                    idx = resolveexpr(&e);
+                    if (e != NULL)
+                    {
+                        error("not const");
+                    }
+                    if (idx > UINT8_MAX)
+                        error("out of range");
+                    outb(idx);
                     break;
                 }
                 /* fallthrough */

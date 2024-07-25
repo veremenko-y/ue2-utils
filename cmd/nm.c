@@ -111,11 +111,7 @@ main(argc, argv) char **argv;
             fread(&hdr, sizeof(struct header), 1, fi);
             if (IS_MAGIC_VALID(hdr.magic) == 0) /* archive element not in  */
                 continue;           /* proper format - skip it */
-            o = hdr.textsize + hdr.datasize;
-            if (hdr.hasrel)
-            {
-                o <<= 1;
-            }
+            o = hdr.textsize + hdr.datasize + hdr.trelsize + hdr.drelsize;
             fseek(fi, SYMOFFSET(hdr), SEEK_SET);
             n = hdr.symsize;
             if (n == 0)

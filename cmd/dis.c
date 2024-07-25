@@ -126,7 +126,7 @@ main(argc, argv) char **argv;
                 if((rel & RELSEG) == RELBSS)
                     printf("BSS ");
             }
-            printf("rel: %04x mask %04x value %04x\n", rel, (word_t)~(RELTYPE), (word_t)(rel & ~(RELTYPE)));
+            printf("rel: %04x mask %04x value %04x\n", rel, (addr_t)~(RELTYPE), (addr_t)(rel & ~(RELTYPE)));
             rel = rel & ~(RELTYPE);
             if(rel != 0) {
                 printf("%d ", rel); 

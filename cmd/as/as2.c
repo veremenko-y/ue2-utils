@@ -7,18 +7,20 @@ assemble()
     int c;
     fout = fopen(outname, "w");
     hdr.magic = MAGIC_OBJ;
-    hdr.hasrel = 1;
+    /* hdr.hasrel = 1; */
     hdr.textsize = segsize[SEGTEXT];
     hdr.datasize = segsize[SEGDATA];
     hdr.bsssize = segsize[SEGBSS];
     hdr.consize = segsize[SEGCONST];
+    hdr.trelsize = segsize[SEGTEXT + SIZERELOFF];
+    hdr.drelsize = segsize[SEGDATA + SIZERELOFF];
     if (hdr.textsize & 1)
     {
-        error("text misaligned");
+        /* error("text misaligned"); */
     }
     if (hdr.datasize & 1)
     {
-        error("data misaligned");
+        /* error("data misaligned"); */
     }
     hdr.symsize = symscnt - symstart;
     fwrite(&hdr, sizeof(hdr), 1, fout);

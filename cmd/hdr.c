@@ -41,12 +41,14 @@ main(argc, argv) char **argv;
             printf("EXE");
         }
         printf(" load: %04x\n",hdr.load);
-        printf("hasrel:\t%c\n", hdr.hasrel ? 'y' : 'n');
+        /* printf("hasrel:\t%c\n", hdr.hasrel ? 'y' : 'n'); */
         printf("text: %04x ", hdr.textsize);
         printf("data: %04x ", hdr.datasize);
         printf("bss: %04x ", hdr.bsssize);
         printf("con: %02x ", hdr.consize);
         printf("sym: %04x\n", hdr.symsize);
+        printf("trel: %04x\n", hdr.trelsize);
+        printf("drel: %04x\n", hdr.drelsize);
         fclose(fi);
     }
 }

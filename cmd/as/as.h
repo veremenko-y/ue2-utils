@@ -54,7 +54,7 @@ struct expr
     union {
         struct expr *expr;
         struct sym* sym;
-        word_t val;
+        addr_t val;
     } l;
     uint8_t op;
     struct expr *r;
@@ -79,7 +79,7 @@ extern uint16_t symstart;
 extern char strbuf[NAMESZ + 1];
 
 /* as1 */
-extern uint16_t segsize[4];
+extern uint16_t segsize[6];
 
 extern error(format, args);
 

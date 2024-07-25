@@ -87,7 +87,6 @@ function newfile() {
 }
 
 function src() {
-    rm -f $1.s $1.o
     while IFS= read -r line; do
         IFS=';'; t=($line); unset IFS
         echo ${t[0]} >> $1.s
@@ -141,7 +140,7 @@ function cleanup() {
 }
 
 function runtest() {
-    cleanup
+    #cleanup
     org=0
     f=$1
     name="${f%.*}"
@@ -151,9 +150,18 @@ function runtest() {
     expect
 }
 
-if [ "$1" == "--detailed" ]; then
+cleanup
+
+if [ "$1" == "--detailed" ] || [ "$1" == "-d" ]; then
     detailed=true
     shift
+elif [ "$1" == "--help" ] || [ "$1" == "-h" ] ; then
+    echo "Usage: test.sh [--detailed] [test_name]"
+    echo
+    echo "Options:"
+    echo -e "\t-d, --detailed       fail at the first test and show binary diff"
+    echo -e "\t-h, --help           this help"
+    exit 0
 fi
 if [ "$1" == "" ]; then
     for f in *.test; do
@@ -161,6 +169,6 @@ if [ "$1" == "" ]; then
     cleanup
     done
 else
-    runtest $1
+    runtest "$1.test"
     cleanup
 fi

@@ -1,0 +1,6 @@
+.set A,2
+.set B,A+3
+.byte A
+.byte B
+; byte 2
+; byte 5

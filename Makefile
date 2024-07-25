@@ -1,5 +1,10 @@
+.SUFFIXES:
+.PHONY: all clean test
 
+export BITS12
+#export BITS16
 
+#export CC := gcc -v
 export CC := gcc
 
 export CFLAGS =
@@ -10,7 +15,6 @@ export DESTDIR = /opt/ue2
 export PREFIX = ue2-
 export MAKE = make --no-print-directory 
 
-
 ifeq ($(OS),Windows_NT)
 
 export PWD=$(CURDIR)
@@ -18,7 +22,7 @@ export SUFIX=.exe
 
 else
 
-export ARCH=-m32
+#export ARCH=-m32
 export PWD=$(shell pwd)
 
 endif
@@ -30,25 +34,29 @@ CFLAGS +=-Os -s
 else
 CFLAGS +=-Og -g -ggdb
 endif
+
 CFLAGS += -fno-pie -no-pie # not to make a position independent executable (PIE)
 CFLAGS += -fno-ident # GCC outputs an entire section to advertise itself, which, once padded/aligned is significant in a small program
 DISWARN = -Wno-int-conversion -Wno-incompatible-pointer-types # Disable specific warnings, because old Unix code
 CFLAGS += -fdiagnostics-color=always -std=c90 $(ARCH) $(DISWARN) 
-export LDFLAGS = $(ARCH)
-
-.PHONY: all clean test
+CLFAGS += -flto
+export LDFLAGS = $(ARCH) -Wl,-no-pie,-flto
 
 all: src
 	mkdir -p bin
 	$(MAKE) -C cmd -f build.mk
 	$(MAKE) -C cmd/as -f build.mk
+	$(MAKE) -C cmd/c -f build.mk
 	$(MAKE) -C cmd/cpp -f build.mk
+# 	$(MAKE) -C cmd/lcpp -f build.mk
 #	$(MAKE) -C src -f build.mk all
-
-src:
 
 clean:
 	rm -f bin/*
+	$(MAKE) -C cmd/cpp -f build.mk clean
+#	$(MAKE) -C cmd/c -f build.mk clean
+#	$(MAKE) -C cmd/lcpp -f build.mk clean
+
 
 test-print: all
 	mkdir -p tmp
@@ -59,6 +67,13 @@ test: all
 	mkdir -p tmp
 	rm -f tmp/*
 	(pushd test && ./tests.sh; popd)
+
+test-one: all
+# ./bin/ue2-ccom test/test1.c -o test1.tok
+	mkdir -p tmp
+	rm -f tmp/*
+	(pushd test && ./tests.sh --detailed align-noop; popd)
+
 #	./bin/ue2-cpp -Itest test/hellorld.s -o test/hellorld.asm
 #	./bin/ue2-as test/hellorld.asm -o $(TMP_DIR)/hellorld.out
 #	./bin/ue2-as test/def.s -o $(TMP_DIR)/def.out

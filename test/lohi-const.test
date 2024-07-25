@@ -1,0 +1,10 @@
+.set ADDR, 0x1234
+ldl >ADDR ; ldl 12
+ldl <ADDR ; ldl 34
+lda >ADDR ; lda 12
+lda <ADDR ; lda 34
+ldl #>ADDR ; ldl $(offset 4)
+ldl #<ADDR ; ldl $(offset 3)
+; byte 12
+; byte 34
+

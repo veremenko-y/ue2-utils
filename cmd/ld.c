@@ -71,8 +71,8 @@ struct lsym
     uint8_t name[NAMESZ + 1];
     uint8_t type;
     uint8_t segm;
-    word_t value;
-    word_t caddr;
+    addr_t value;
+    addr_t caddr;
 } PACKED;
 
 error(format, args) char *format;
@@ -122,6 +122,7 @@ uint16_t bsize;
 
 FILE *fout;
 FILE *fout2;
+int errors;
 
 /* output params */
 char *outname = "a.out";
@@ -152,7 +153,7 @@ symfind()
     }
 }
 
-symidxfind(idx) uint16_t idx;
+symidxfind(idx) irword_t idx;
 {
     cursymn = 0;
     cursym = syms;
@@ -242,7 +243,7 @@ symdump()
         puts("");
     }
 }
-#define symdump(...)
+/* #define symdump(...) */
 
 symreloc()
 {
@@ -340,12 +341,19 @@ load2(f)
         /* Find unresolved consts */
         /* symprintp(&sym, 0);
         puts(""); */
+        memcpy(strbuf, sym.name, NAMESZ);
+        symfind();
+        if (cursym->name[0] && (cursym->type & SYMTYPE) == SYMUNDEF)
+        {
+            printf("ld: '%s' undefined\n", cursym->name);
+            errors++;
+            continue;
+        }
         if ((sym.type & (SYMCONST | SYMREL)) != SYMCONST)
         {
             continue;
         }
-        memcpy(strbuf, sym.name, NAMESZ);
-        symfind();
+
         if ((cursym->type & (SYMCONST | SYMREL)) != SYMCONST)
         {
             continue;
@@ -387,6 +395,38 @@ load2(f)
     }
 }
 
+/* freadir(irword_t *ir, FILE *f)
+{
+    int i, c, r;
+    r = 0;
+    *ir = 0;
+    for(i = 0; i < IRSIZE; i++)
+    {
+        *ir <<= 8;
+        c = getc(f);
+        if(c >= 0) r++;
+        *ir |= c;
+    }
+    return r;
+} */
+
+fwriteir(irword_t *ir, FILE *f)
+{
+    int i;
+    char c;
+    uint8_t buf[IRSIZE];
+    for (i = 0; i < IRSIZE; i++)
+    {
+        buf[i] = *ir & 0xff;
+        *ir >>= 8;
+        /* c = (*ir) & (0xff << (IRSIZE - i - 1)); */
+        /* c = ((char *)ir)[i]; */
+        /* printf("%x at %d\n", c, IRSIZE - i - 1); */
+        /* putc(c, f); */
+    }
+    fwrite(buf, sizeof(uint8_t), IRSIZE, f);
+}
+
 /* Resolve relocations and write output */
 load3(f, frel, iscode)
     FILE *f;
@@ -398,37 +438,65 @@ FILE *frel;
         error("invalid file");
     fseek(f, CODEOFFSET(hdr), SEEK_SET);
     fseek(frel, RELCODEOFFSET(hdr), SEEK_SET);
-    word_t code;
-    word_t rel;
+    irword_t code;
+    irword_t rel;
+    char codebuf[IRSIZE];
+    char relbuf[IRSIZE];
     int addr = 0;
     int size = hdr.textsize + hdr.datasize;
-    int read;
+    int read, c;
     while (addr < size)
     {
         if (addr == hdr.textsize)
         {
             out = fout2;
         }
-        read = fread(&code, 1, sizeof(code), f);
-        fread(&rel, 1, sizeof(rel), frel);
-        bswap(&code);
-        INFO("%04x: %04x rel %04x", addr, code, rel);
-        if (rel & RELCONST)
+        code = read = rel = 0;
+        while (read < IRSIZE)
+        {
+            c = fgetc(f);
+            if (c < 0)
+                break;
+            codebuf[read] = c;
+            code <<= 8;
+            code |= c;
+            if (read == 0 || rel != 0)
+            {
+                c = fgetc(frel);
+                /* printf("%x %x %d\n", rel, c, read); */
+                relbuf[read] = c;
+                rel <<= 8;
+                rel |= c;
+            }
+            read++;
+            if(rel == 0) {
+                break;
+            }
+        }
+        /* printf("code %x rel %x\n", code, rel); */
+        if (rel == 0)
+        {
+            fwrite(codebuf, sizeof(codebuf[0]), read, out);
+            addr += read;
+            continue;
+        }
+        else if (rel & RELCONST)
         {
             if ((rel & ~(RELCONST)) == 0)
             {
-                code = (code & 0xf000) | GETCONSTADDR(code & 0x0fff); /* Set const value from table */
+                printf("%x at $%x\n", code & DATAMAX, GETCONSTADDR(code & 0xff));
+                code = (code & IRMASK) | GETCONSTADDR(code & 0xff); /* Set const value from table */
             }
             else
             {
                 symidxfind((rel & ~(RELCONST)));
-                code = (code & 0xf000) + cursym->value;
+                code = (code & IRMASK) + cursym->value;
             }
             INFO("CONST %04x ==> %04x\n", rel & ~(RELCONST), code);
         }
         else if (rel & RELSEG)
         {
-            int seg = ((rel & RELSEG) >> RELSEGSHIFT) -1;
+            int seg = ((rel & RELSEG) >> RELSEGSHIFT) - 1;
             INFO("REG %d %d\n", seg, rel);
             INFO("%04x ==> ", code);
             switch (seg)
@@ -450,18 +518,16 @@ FILE *frel;
         }
         else if (rel != 0)
         {
+            puts("index");
             symidxfind(rel - 1);
             INFO("REF %d name %s\n", rel - 1, cursym->name);
             code = code + cursym->value; /* value + reloc offset */
             INFO("%04x\n", code);
         }
-        else
-        {
-            INFO("%04x\n", code);
-        }
-        bswap(&code);
-        fwrite(&code, sizeof(code), 1, out);
-        addr += sizeof(word_t);
+        /* bswap(&code); */
+        fwriteir(&code, out);
+        /* fwrite(&code, sizeof(code), 1, out); */
+        addr += read;
     }
     treloc += hdr.textsize;
     dreloc += hdr.datasize;
@@ -522,7 +588,8 @@ char **argv;
     for (i = args; i < argc; i++)
     {
         fin = fopen(argv[i], "r");
-        if(fin == NULL) {
+        if (fin == NULL)
+        {
             error("can't open %s", argv[i]);
         }
         load1(fin);
@@ -537,6 +604,11 @@ char **argv;
         fin = fopen(argv[i], "r");
         load2(fin);
         fclose(fin);
+    }
+
+    if (errors > 0)
+    {
+        error("ld: failed to link");
     }
 
     borigin = corigin + consize;
@@ -560,7 +632,7 @@ char **argv;
         }
     }
 
-    symdump();
+  /*   symdump(); */
 
     INFO("consts: %d", consize);
     for (i = 0; i < 256; i++)
@@ -580,7 +652,7 @@ char **argv;
     if (!b_flag)
     {
         hdr.magic = MAGIC_EXE;
-        hdr.hasrel = 0;
+        /* hdr.hasrel = 0; */
         hdr.textsize = tsize;
         hdr.datasize = dsize + consize;
         hdr.consize = csize;

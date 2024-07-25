@@ -9,8 +9,6 @@ uint16_t lineno;
 uint16_t charno;
 char* outname = "a.out";
 
-nothing() {}
-
 error(format, args) char *format;
 va_list *args;
 {

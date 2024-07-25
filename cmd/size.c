@@ -44,10 +44,11 @@ main(argc, argv) char **argv;
         }
         if (gorp > 2)
             printf("\n%s: \n", *argv);
-        printf("text: %u (0x%04x) data: %u (0x%04x) bss: %u (0x%04x) ",
+        printf("text: %u (0x%04x) data: %u (0x%04x) bss: %u (0x%04x)\n",
                hdr.textsize, hdr.textsize,
                hdr.datasize, hdr.datasize,
                hdr.bsssize, hdr.bsssize);
+   
         sum = hdr.textsize + hdr.datasize + hdr.bsssize;
         printf("total: %u (0x%04x)\n", sum);
         if (hdr.symsize)
@@ -60,11 +61,16 @@ main(argc, argv) char **argv;
         {
             symsize = 0;
         }
+        if(hdr.trelsize != 0 ||  hdr.drelsize != 0) {
+            printf("trel: %u (0x%04x) drel: %u (0x%04x)\n",
+                hdr.trelsize, hdr.trelsize,
+                hdr.drelsize,hdr.drelsize);
+        }
 
         sum = hdr.textsize +
               hdr.datasize +
               symsize +
-              (hdr.hasrel ? hdr.textsize + hdr.datasize : 0) +
+              hdr.trelsize + hdr.drelsize +
               sizeof(struct header);
 
 #if 0    
