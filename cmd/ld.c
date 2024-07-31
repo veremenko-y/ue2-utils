@@ -83,11 +83,28 @@ va_list *args;
     exit(2);
 }
 
-bswap(p)
-    uint16_t *p;
+bswap16(uint16_t *s)
 {
-    *p = (*p >> 8) | (*p << 8);
+    *s = *s >> 8 | *s << 8;
 }
+
+bswap24(uint8_t *s)
+{
+    *s = (uint32_t)(s[0] << 16 | s[1] << 8 | s[2]);
+}
+
+bswap32(uint8_t *s)
+{
+    *s = (uint32_t)(s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3]);
+}
+
+#ifdef BITS12
+#define bswapaddr bswap16
+#define bswapir bswap16
+#else
+#define bswapaddr bswap16
+#define bswapir bswap24
+#endif
 
 #define GETCONSTADDR(x) ((corigin + consts[x] - 1))
 
@@ -395,96 +412,67 @@ load2(f)
     }
 }
 
-/* freadir(irword_t *ir, FILE *f)
-{
-    int i, c, r;
-    r = 0;
-    *ir = 0;
-    for(i = 0; i < IRSIZE; i++)
-    {
-        *ir <<= 8;
-        c = getc(f);
-        if(c >= 0) r++;
-        *ir |= c;
-    }
-    return r;
-} */
-
-fwriteir(irword_t *ir, FILE *f)
-{
-    int i;
-    char c;
-    uint8_t buf[IRSIZE];
-    for (i = 0; i < IRSIZE; i++)
-    {
-        buf[i] = *ir & 0xff;
-        *ir >>= 8;
-        /* c = (*ir) & (0xff << (IRSIZE - i - 1)); */
-        /* c = ((char *)ir)[i]; */
-        /* printf("%x at %d\n", c, IRSIZE - i - 1); */
-        /* putc(c, f); */
-    }
-    fwrite(buf, sizeof(uint8_t), IRSIZE, f);
-}
-
 /* Resolve relocations and write output */
-load3(f, frel, iscode)
-    FILE *f;
-FILE *frel;
+load3(FILE *f, int fsize, FILE *frel, int frelsize, FILE *out)
 {
-    FILE *out = fout;
-    fread(&hdr, sizeof(hdr), 1, f);
-    if (IS_MAGIC_VALID(hdr.magic) == 0)
-        error("invalid file");
-    fseek(f, CODEOFFSET(hdr), SEEK_SET);
-    fseek(frel, RELCODEOFFSET(hdr), SEEK_SET);
+    int findex = 0;
+    int frelindex = 0;
+
     irword_t code;
     irword_t rel;
-    char codebuf[IRSIZE];
-    char relbuf[IRSIZE];
-    int addr = 0;
-    int size = hdr.textsize + hdr.datasize;
+    irword_t addr;
+
     int read, c;
-    while (addr < size)
+    while (findex < fsize)
     {
-        if (addr == hdr.textsize)
+        if (frelsize == 0)
         {
-            out = fout2;
-        }
-        code = read = rel = 0;
-        while (read < IRSIZE)
-        {
-            c = fgetc(f);
-            if (c < 0)
-                break;
-            codebuf[read] = c;
-            code <<= 8;
-            code |= c;
-            if (read == 0 || rel != 0)
+           /*  printf("frelsize == 0\n");
+            printf("dump from %x to %x\n", findex, fsize); */
+
+            while (findex < fsize)
             {
-                c = fgetc(frel);
-                /* printf("%x %x %d\n", rel, c, read); */
-                relbuf[read] = c;
-                rel <<= 8;
-                rel |= c;
+                putc(getc(f), out);
+                findex++;
             }
-            read++;
-            if(rel == 0) {
-                break;
-            }
+            break;
         }
-        /* printf("code %x rel %x\n", code, rel); */
+
+        read = fread(&addr, ADDRBSIZE, 1, frel);
+        bswapaddr(&addr);
+        frelindex += ADDRBSIZE;
+        frelsize -= ADDRBSIZE;
+        /* printf("index %x\n", findex);
+        printf("addr %x\n", (int)addr); */
+        if((int)addr < findex)
+        {
+            error("wtf");
+        }
+        while (findex < addr)
+        {
+            putc(getc(f), out);
+            findex++;
+        }
+        fread(&rel, IRBSIZE, 1, frel);
+        bswapir(&rel);
+        INFO("read rel %x at %x of %x = %x\n", rel, frelindex, frelsize, addr);
+        frelindex += IRBSIZE;
+        frelsize -= IRBSIZE;
+
+        fread(&code, IRBSIZE, 1, f);
+        findex+= IRBSIZE;
+        bswapir(&code);
+        
         if (rel == 0)
         {
-            fwrite(codebuf, sizeof(codebuf[0]), read, out);
-            addr += read;
+            error("unexp rel");
             continue;
         }
         else if (rel & RELCONST)
         {
             if ((rel & ~(RELCONST)) == 0)
             {
-                printf("%x at $%x\n", code & DATAMAX, GETCONSTADDR(code & 0xff));
+                INFO("%x at $%x\n", code & DATAMAX, GETCONSTADDR(code & 0xff));
                 code = (code & IRMASK) | GETCONSTADDR(code & 0xff); /* Set const value from table */
             }
             else
@@ -524,14 +512,10 @@ FILE *frel;
             code = code + cursym->value; /* value + reloc offset */
             INFO("%04x\n", code);
         }
-        /* bswap(&code); */
-        fwriteir(&code, out);
-        /* fwrite(&code, sizeof(code), 1, out); */
-        addr += read;
+        bswapir(&code);
+        fwrite(&code, IRBSIZE, 1, out);
+        addr+= IRBSIZE;
     }
-    treloc += hdr.textsize;
-    dreloc += hdr.datasize;
-    breloc += hdr.bsssize;
 }
 
 main(argc, argv) int argc;
@@ -632,7 +616,7 @@ char **argv;
         }
     }
 
-  /*   symdump(); */
+    /*   symdump(); */
 
     INFO("consts: %d", consize);
     for (i = 0; i < 256; i++)
@@ -671,7 +655,17 @@ char **argv;
     {
         fin = fopen(argv[i], "r");
         finr = fopen(argv[i], "r");
-        load3(fin, finr, fout, fout2);
+        fread(&hdr, sizeof(hdr), 1, fin);
+        if (IS_MAGIC_VALID(hdr.magic) == 0)
+            error("invalid file");
+
+        fseek(fin, CODEOFFSET(hdr), SEEK_SET);
+        fseek(finr, RELCODEOFFSET(hdr), SEEK_SET);
+        load3(fin, hdr.textsize, finr, hdr.trelsize, fout);
+        load3(fin, hdr.datasize, finr, hdr.drelsize, fout2);
+        treloc += hdr.textsize;
+        dreloc += hdr.datasize;
+        breloc += hdr.bsssize;
         fclose(fin);
         fclose(finr);
     }

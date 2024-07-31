@@ -1,3 +1,0 @@
-ldl >ADDR ; ldl 0
-ldl <ADDR ; ldl 2
-ADDR:

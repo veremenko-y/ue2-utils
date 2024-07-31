@@ -27,6 +27,9 @@ static struct sym ops[] = {
     {".set", STOKSET, 0, 0},
     {".res", STOKRES, 0, 0},
     {".globl", STOKGLOBL, 0, 0},
+    {".macro", STOKGLOBL, 0, 0},
+    {".endm", STOKENDM, 0, 0},
+    {".local", STOKLOCAL, 0, 0},
 };
 
 struct sym *syms;
@@ -291,4 +294,5 @@ scan()
             break;
         }
     }
+    putc('\n', fout);
 }

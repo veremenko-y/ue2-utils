@@ -9,16 +9,28 @@ uint16_t segsize[6];
 int curseg;
 int last_globlbl;
 
-bswap16(p)
-    addr_t *p;
+bswap16(uint16_t *s)
 {
-    *p = (*p >> 8) | (*p << 8);
+    *s = *s >> 8 | *s << 8;
+}
+
+bswap24(uint8_t *s)
+{
+    *s = (uint32_t)(s[0] << 16 | s[1] << 8 | s[2]);
 }
 
 bswap32(uint8_t *s)
 {
     *s = (uint32_t)(s[0] << 24 | s[1] << 16 | s[2] << 8 | s[3]);
 }
+
+#ifdef BITS12
+#define bswapaddr bswap16
+#define bswapir bswap16
+#else
+#define bswapaddr bswap16
+#define bswapir bswap24
+#endif
 
 
 static peek()
@@ -138,51 +150,44 @@ static outins(addr_t ins, addr_t arg)
         int i;
         char c;
         irword_t ir = (ins << IRSHIFT) | arg;
-        /* bswap32(&ir); */
-        /* printf("outins: "); */
-        for(i = 0; i < IRSIZE; i++)
-        {
-            c = ((char*)&ir)[IRSIZE - i - IROFFSET];
-            /* printf("%02x ", (int)(c & 0xff)); */
-            putc(c, segout[curseg]);
-        }
-    /*     putchar('\n'); */
-        /* fwrite(&ins, sizeof(ins), 1, segout[curseg]);
-        ins = 0;
-        fwrite(&ins, sizeof(ins), 1, segout[curseg + RELOFFS]); */
+        bswapir(&ir);
+        fwrite(&ir, IRBSIZE, 1, segout[curseg]);
     }
-    segsize[curseg] += IRSIZE;
-    putc(0, segout[curseg + RELOFFS]);
-    segsize[curseg + SIZERELOFF] += 1;
+    segsize[curseg] += IRBSIZE;
+    /* putc(0, segout[curseg + RELOFFS]);
+    segsize[curseg + SIZERELOFF] += 1; */
 }
 
 static outrel(addr_t ins, addr_t arg, irword_t rel)
 {
-    if (curseg >= SEGBSS)
+    addr_t addr = segsize[curseg];
+    outins(ins,arg);
+    if(passno == 1)
+    {
+        bswapaddr(&addr);
+        fwrite(&addr, ADDRBSIZE, 1, segout[curseg + RELOFFS]);
+        segsize[curseg + SIZERELOFF] += ADDRBSIZE;
+        bswapir(&rel);
+        fwrite(&rel, IRBSIZE, 1, segout[curseg + RELOFFS]);
+        segsize[curseg + SIZERELOFF] += IRBSIZE;
+    }
+ /*    if (curseg >= SEGBSS)
         error("bss out");
     if (passno == 1)
     {
  int i;
         char c;
         irword_t ir = (ins << IRSHIFT) | arg;
-/*         bswap32(&ir);
-        bswap32(&rel); */
-
         for(i = 0; i < IRSIZE; i++)
         {
             c = ((char*)&ir)[IRSIZE - i - IROFFSET];
-            /* printf("%02x ", (int)(c & 0xff); */
             putc(c, segout[curseg]);
             c = ((char*)&rel)[IRSIZE - i - IROFFSET];
             putc(c, segout[curseg + RELOFFS]);
         }
-/*         ins = (ins << 12) | arg;
-        bswap16(&ins);
-        fwrite(&ins, sizeof(ins), 1, segout[curseg]);
-        fwrite(&rel, sizeof(rel), 1, segout[curseg + RELOFFS]); */
     }
     segsize[curseg] += IRSIZE;
-    segsize[curseg+SIZERELOFF] += IRSIZE;
+    segsize[curseg+SIZERELOFF] += IRSIZE; */
 }
 
 static outb(uint8_t b)
@@ -192,11 +197,11 @@ static outb(uint8_t b)
     if (passno == 1)
     {
         putc(b, segout[curseg]);
-        b = 0;
-        putc(b, segout[curseg + RELOFFS]);
+        /* b = 0;
+        putc(b, segout[curseg + RELOFFS]); */
     }
     segsize[curseg]++;
-    segsize[curseg+SIZERELOFF]++;
+    /* segsize[curseg+SIZERELOFF]++; */
 }
 
 struct expr expr[EXPRSIZE];
@@ -553,6 +558,7 @@ static parseins()
             {
                 if (e->op == '<' || e->op == '>')
                 {
+                    /* p = e->l.sym; */
                 }
             }
         }
@@ -728,9 +734,11 @@ static parseres()
     if (curseg != SEGBSS)
     {
         fseek(segout[curseg], idx, SEEK_CUR);
-        fseek(segout[curseg + RELOFFS], idx, SEEK_CUR);
+        /* fseek(segout[curseg + RELOFFS], idx, SEEK_CUR); */
     }
 }
+
+uint8_t inmacro;
 
 parse()
 {
@@ -816,6 +824,21 @@ parse()
             case STOKRES:
                 TRACE("STOKRES");
                 parseres();
+                break;
+            case STOKMACRO:
+                if(inmacro) {
+                    error("already in macro");
+                }
+                inmacro = 1;
+                while(peek() == TOKSYM)
+                {
+                    
+                }
+                break;
+            case STOKENDM:
+                if(!inmacro) {
+                    error("not in macro");
+                }
                 break;
             case STOKBYTE:
                 TRACE("STOKBYTE");

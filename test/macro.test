@@ -1,0 +1,14 @@
+.macro bnl addr
+.local skip
+    bl skip
+    scf C
+    bl addr
+skip:
+.endm
+
+bnl here
+; bl 6
+; scf 1
+; bl 7
+.res 1 ; byte 0
+here:

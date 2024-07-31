@@ -10,17 +10,21 @@
 
 #define NAMESZ 16
 
+#define BITS12
+
 #ifdef BITS12
+
 
 typedef uint16_t addr_t;
 typedef uint16_t data_t;
-typedef uint32_t irword_t;
-#define IRSIZE 3
-#define IROFFSET 1
-#define IRSHIFT 16
+typedef uint16_t irword_t;
+#define IRBSIZE 2
+#define IROFFSET 0
+#define IRSHIFT 12
 #define IRMASK (0xf << IRSHIFT)
 #define RELSHIFT (IRSHIFT + 4)
-#define ADDRSIZE (1 << 16)
+#define ADDRBSIZE 2
+#define ADDRSIZE (1 << 12)
 #define ADDRMAX (ADDRSIZE - 1)
 #define DATASIZE (1 << 8)
 #define DATAMAX  (DATASIZE - 1)
@@ -29,13 +33,14 @@ typedef uint32_t irword_t;
 
 typedef uint16_t addr_t;
 typedef uint16_t data_t;
-typedef uint16_t irword_t;
-#define IRSIZE 2
-#define IROFFSET 0
-#define IRSHIFT 12
+typedef uint32_t irword_t;
+#define IRBSIZE 3
+#define IROFFSET 1
+#define IRSHIFT 16
 #define IRMASK (0xf << IRSHIFT)
 #define RELSHIFT (IRSHIFT + 4)
-#define ADDRSIZE (1 << 12)
+#define ADDRBSIZE 2
+#define ADDRSIZE (1 << 16)
 #define ADDRMAX (ADDRSIZE - 1)
 #define DATASIZE (1 << 8)
 #define DATAMAX  (DATASIZE - 1)
@@ -62,6 +67,7 @@ struct sym
 #define SYMABS (1 << 0) /* absolute value */
 #define SYMREL (1 << 1) /* relative value */
 #define SYMCONST (1 << 2) /* constant value (to be emmited into data segment) */
+#define SYMMACRO (1 << 3) /* internal */
 
 #define SYMTYPE (SYMABS | SYMREL | SYMCONST)
 
@@ -104,7 +110,9 @@ struct header
     ((hdr.textsize + hdr.datasize + hdr.trelsize + hdr.drelsize) + sizeof(hdr))
     
 #define CODEOFFSET(hdr) (sizeof(hdr))
+#define DATAOFFSET(hdr) (sizeof(hdr) + hdr.textsize)
 #define RELCODEOFFSET(hdr) (sizeof(hdr) + hdr.textsize + hdr.datasize)
+#define RELDATAOFFSET(hdr) (sizeof(hdr) + hdr.textsize + hdr.datasize + hdr.trelsize)
 
 
 #endif

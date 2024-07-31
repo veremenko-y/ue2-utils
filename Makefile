@@ -1,7 +1,7 @@
 .SUFFIXES:
 .PHONY: all clean test
 
-export BITS12
+#export BITS12
 #export BITS16
 
 #export CC := gcc -v

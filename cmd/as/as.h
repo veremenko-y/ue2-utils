@@ -26,6 +26,9 @@
 #define STOKSET 8
 #define STOKRES 9
 #define STOKGLOBL 10
+#define STOKMACRO 11
+#define STOKENDM 12
+#define STOKLOCAL 13
 
 #define SYMID(x) (x - symstart)
 
@@ -58,6 +61,12 @@ struct expr
     } l;
     uint8_t op;
     struct expr *r;
+} PACKED;
+
+struct macro
+{
+    uint8_t args;
+    uint8_t tokens[32];
 } PACKED;
 
 

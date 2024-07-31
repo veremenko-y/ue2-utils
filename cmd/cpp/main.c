@@ -14,6 +14,15 @@
 #include "cc.h"
 
 
+#ifndef strlcpy
+#define strlcpy strncpy
+#endif
+
+#ifndef strlcat
+#define strlcat strncat
+#endif
+
+
 #ifndef _ltoa
 const char *_ultoa(unsigned long val)
 {
