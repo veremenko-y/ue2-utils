@@ -46,7 +46,7 @@ all: src
 	mkdir -p bin
 	$(MAKE) -C cmd -f build.mk
 	$(MAKE) -C cmd/as -f build.mk
-	$(MAKE) -C cmd/c -f build.mk
+#	$(MAKE) -C cmd/c -f build.mk
 	$(MAKE) -C cmd/cpp -f build.mk
 # 	$(MAKE) -C cmd/lcpp -f build.mk
 #	$(MAKE) -C src -f build.mk all
