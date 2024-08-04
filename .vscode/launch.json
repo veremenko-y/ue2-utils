@@ -5,11 +5,88 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "ue2-as",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/ue2-as",
-            "args": ["${workspaceFolder}/hellorld.s"],
+            "program": "${workspaceFolder}/bin/ue2-as",
+            "args": ["${workspaceFolder}/test/const-abs.s"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Make Project"
+        },
+        {
+            "name": "ue2-cpp",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/ue2-cpp",
+            "args": ["${workspaceFolder}/test/hellorld.s", "-o", "${workspaceFolder}/test/hellorld.Sout"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/test",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Make Project"
+        },        
+        {
+            "name": "ue2-ld",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/ue2-ld",
+            //-b -o $(TMP_DIR)/test1.bin -L
+            "args": [ "-o", "${workspaceFolder}/tmp/test1.bin", "${workspaceFolder}/test/tmp.out"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Make Project"
+        },
+        {
+            "name": "ue2-fsc",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/ue2-fsc",
+            //-b -o $(TMP_DIR)/test1.bin -L
+            //"args": [ "-o", "${workspaceFolder}/tmp/test1.bin", "${workspaceFolder}/test/tmp.out"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -18,17 +95,42 @@
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
-                    "code": "-enable-pretty-printing",
+                    "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 },
                 {
                     "description": "Set Disassembly Flavor to Intel",
-                    "code": "-gdb-set disassembly-flavor intel",
+                    "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
             ],
             "preLaunchTask": "Make Project"
-        }
-
+        },
+        {
+            "name": "ue2-ccom",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/ue2-ccom",
+            //-b -o $(TMP_DIR)/test1.bin -L
+            "args": ["${workspaceFolder}/test/test1.c", "-o", "${workspaceFolder}/test1.tok"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Make Project"
+        },
     ]
 }
